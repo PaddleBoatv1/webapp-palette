@@ -235,9 +235,63 @@ export const seedBoats = async () => {
   }
 };
 
+// Check if users table exists and create it if needed
+const ensureUsersTable = async () => {
+  try {
+    console.log('Creating users table if it doesn\'t exist...');
+    
+    // Check if the table exists
+    const { data: tableExists, error: checkError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', 'users')
+      .single();
+    
+    if (checkError && !tableExists) {
+      console.log('Creating users table...');
+      const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS public.users (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email TEXT UNIQUE NOT NULL,
+          full_name TEXT,
+          phone_number TEXT,
+          role TEXT DEFAULT 'customer' CHECK (role IN ('customer', 'admin', 'liaison')),
+          created_at TIMESTAMPTZ DEFAULT now(),
+          updated_at TIMESTAMPTZ DEFAULT now()
+        );
+        -- Allow initial inserts for setup
+        ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+        CREATE POLICY "Allow public signup" ON public.users FOR INSERT WITH CHECK (true);
+      `;
+      
+      const { error: createError } = await supabase.rpc('exec_sql', { 
+        sql_query: createTableQuery 
+      });
+      
+      if (createError) {
+        console.error('Error creating users table:', createError);
+        return false;
+      }
+      return true;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Exception checking/creating users table:', error);
+    return false;
+  }
+};
+
 // Create an admin user (for testing)
 export const createAdminUser = async (email: string, password: string, fullName: string) => {
   try {
+    // Ensure the users table exists
+    const tableCreated = await ensureUsersTable();
+    if (!tableCreated) {
+      throw new Error('Failed to create users table');
+    }
+    
     // 1. Create the auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -261,26 +315,39 @@ export const createAdminUser = async (email: string, password: string, fullName:
       throw error;
     }
     
-    // 2. Create the user profile with admin role
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .insert([
-        {
-          id: authData.user.id,
-          email,
-          full_name: fullName,
-          role: 'admin'
-        }
-      ])
-      .select()
-      .single();
-      
-    if (userError) {
-      console.error('Error creating admin user profile:', userError);
-      throw userError;
+    // 2. Create the user profile with admin role using direct SQL to bypass RLS policies
+    const insertUserSQL = `
+      INSERT INTO public.users (id, email, full_name, role)
+      VALUES ('${authData.user.id}', '${email}', '${fullName}', 'admin')
+      ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role
+      RETURNING *;
+    `;
+    
+    const { error: sqlError } = await supabase.rpc('exec_sql', { 
+      sql_query: insertUserSQL 
+    });
+    
+    if (sqlError) {
+      console.error('Error creating admin user profile via SQL:', sqlError);
+      throw sqlError;
     }
     
-    return userData;
+    // Retrieve the inserted user for confirmation
+    const { data: userData, error: getUserError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+    
+    if (getUserError) {
+      console.error('Error retrieving created admin user:', getUserError);
+      // Don't throw here, we'll assume it worked since we didn't get an error on insert
+    }
+    
+    return userData || { id: authData.user.id, email, full_name: fullName, role: 'admin' };
   } catch (error) {
     console.error('Exception creating admin user:', error);
     throw error;

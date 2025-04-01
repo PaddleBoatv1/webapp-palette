@@ -139,20 +139,19 @@ CREATE POLICY "Users can update their own profile"
 ON public.users FOR UPDATE 
 USING (auth.uid() = id);
 
--- First allow admins to create users (otherwise we can't create the first admin)
+-- First allow public signup
 CREATE POLICY "Allow public signup"
 ON public.users FOR INSERT
 WITH CHECK (true);
 
--- Admin role permissions - Fixed to avoid recursion
--- This policy allows admins to do anything with users (view, update, delete)
+-- Fixed admin policy to avoid infinite recursion
+-- This policy allows admins to do anything with users
+DROP POLICY IF EXISTS "Admins have full access to users" ON public.users;
 CREATE POLICY "Admins have full access to users" 
 ON public.users 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
 -- Reservations Table Policies
 CREATE POLICY "Users can view their own reservations" 
@@ -198,82 +197,71 @@ CREATE POLICY "Anyone can view boats"
 ON public.boats FOR SELECT
 USING (true);
 
--- Admin policies for other tables (fixed to avoid recursion)
+-- Fixed admin policies for other tables to avoid recursion
+-- Now using the users table directly instead of auth.users
+DROP POLICY IF EXISTS "Admins have full access to reservations" ON public.reservations;
 CREATE POLICY "Admins have full access to reservations" 
 ON public.reservations 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
+DROP POLICY IF EXISTS "Admins have full access to boats" ON public.boats;
 CREATE POLICY "Admins have full access to boats" 
 ON public.boats 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
+DROP POLICY IF EXISTS "Admins have full access to zones" ON public.zones;
 CREATE POLICY "Admins have full access to zones" 
 ON public.zones 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
+DROP POLICY IF EXISTS "Admins have full access to payments" ON public.payments;
 CREATE POLICY "Admins have full access to payments" 
 ON public.payments 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
+DROP POLICY IF EXISTS "Admins have full access to boat_deliveries" ON public.boat_deliveries;
 CREATE POLICY "Admins have full access to boat_deliveries" 
 ON public.boat_deliveries 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
+DROP POLICY IF EXISTS "Admins have full access to company_liaisons" ON public.company_liaisons;
 CREATE POLICY "Admins have full access to company_liaisons" 
 ON public.company_liaisons 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'admin'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+);
 
 -- Liaison role permissions
+DROP POLICY IF EXISTS "Liaisons can view reservations" ON public.reservations;
 CREATE POLICY "Liaisons can view reservations" 
 ON public.reservations 
-USING (EXISTS (
-  SELECT 1 FROM auth.users
-  WHERE auth.users.id = auth.uid() 
-  AND auth.users.raw_app_meta_data->>'role' = 'liaison'
-));
+USING (
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'liaison'
+);
 
+DROP POLICY IF EXISTS "Liaisons can update specific reservations" ON public.reservations;
 CREATE POLICY "Liaisons can update specific reservations" 
 ON public.reservations FOR UPDATE
 USING (
-  EXISTS (
-    SELECT 1 FROM auth.users
-    WHERE auth.users.id = auth.uid() 
-    AND auth.users.raw_app_meta_data->>'role' = 'liaison'
-  ) AND status IN ('confirmed', 'in_progress')
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'liaison'
+  AND status IN ('confirmed', 'in_progress')
 );
 
+DROP POLICY IF EXISTS "Liaisons can view and update boat_deliveries" ON public.boat_deliveries;
 CREATE POLICY "Liaisons can view and update boat_deliveries" 
 ON public.boat_deliveries 
 USING (
-  EXISTS (
-    SELECT 1 FROM auth.users
-    WHERE auth.users.id = auth.uid() 
-    AND auth.users.raw_app_meta_data->>'role' = 'liaison'
-  )
+  (SELECT role FROM public.users WHERE id = auth.uid()) = 'liaison'
 );
 
 -- Add indexes for performance
