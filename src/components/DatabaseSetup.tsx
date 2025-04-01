@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { executeSchema, isSchemaSetup } from '@/lib/schemaUtils';
 import { Separator } from '@/components/ui/separator';
+import { InfoCircledIcon } from '@radix-ui/react-icons';
 
 const DatabaseSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -18,6 +19,7 @@ const DatabaseSetup: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminName, setAdminName] = useState('');
   const [schemaExists, setSchemaExists] = useState<boolean | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSchema = async () => {
@@ -35,6 +37,7 @@ const DatabaseSetup: React.FC = () => {
     try {
       const result = await executeSchema();
       if (result.success) {
+        setSuccess(true);
         setSchemaExists(true);
         toast({
           title: "Schema Created",
@@ -80,9 +83,22 @@ const DatabaseSetup: React.FC = () => {
     }
   };
 
+  const validatePassword = (password: string) => {
+    if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters long');
+      return false;
+    }
+    setPasswordError(null);
+    return true;
+  };
+
   const handleCreateAdmin = async () => {
     if (!adminEmail || !adminPassword || !adminName) {
       setError('Please fill in all admin user fields');
+      return;
+    }
+
+    if (!validatePassword(adminPassword)) {
       return;
     }
 
@@ -99,12 +115,13 @@ const DatabaseSetup: React.FC = () => {
       } else {
         throw new Error('Failed to create admin user');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating admin:', err);
-      setError('Failed to create admin user. Check console for details.');
+      const errorMessage = err.message || 'Failed to create admin user. Check console for details.';
+      setError(errorMessage);
       toast({
         title: "Admin Creation Failed",
-        description: "There was an error creating the admin user.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -138,6 +155,40 @@ const DatabaseSetup: React.FC = () => {
             </Alert>
           )}
           
+          <Alert>
+            <InfoCircledIcon className="h-4 w-4 mr-2" />
+            <AlertTitle>Important Setup Steps</AlertTitle>
+            <AlertDescription className="mt-2">
+              <p>Before proceeding, ensure you've completed these steps in your Supabase project:</p>
+              <ol className="list-decimal list-inside mt-2 ml-2 space-y-1">
+                <li>Create a new SQL function in the SQL Editor called <code>exec_sql</code>:</li>
+                <pre className="bg-slate-100 p-2 rounded text-xs mt-1 mb-2 overflow-x-auto">
+                  {`CREATE OR REPLACE FUNCTION exec_sql(sql_query TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  EXECUTE sql_query;
+END;
+$$;`}
+                </pre>
+                <li>Enable this function for RPC calls:</li>
+                <pre className="bg-slate-100 p-2 rounded text-xs mt-1 overflow-x-auto">
+                  {`CREATE OR REPLACE FUNCTION public.exec_sql(sql_query text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  EXECUTE sql_query;
+END;
+$function$;`}
+                </pre>
+              </ol>
+            </AlertDescription>
+          </Alert>
+          
           <p className="text-sm text-muted-foreground">
             This will create all necessary tables, policies, and indexes in your Supabase project.
             This is a required step before adding sample data or creating users.
@@ -146,7 +197,7 @@ const DatabaseSetup: React.FC = () => {
         <CardFooter>
           <Button
             onClick={handleSchemaSetup}
-            disabled={loading || schemaExists === true}
+            disabled={loading}
             className="w-full"
           >
             {loading ? 'Creating Schema...' : 'Create Database Schema'}
@@ -189,9 +240,15 @@ const DatabaseSetup: React.FC = () => {
                 id="adminPassword"
                 type="password"
                 value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  validatePassword(e.target.value);
+                }}
                 placeholder="••••••••"
               />
+              {passwordError && (
+                <p className="text-sm text-red-500">{passwordError}</p>
+              )}
             </div>
             
             <div className="grid gap-2">
@@ -206,7 +263,7 @@ const DatabaseSetup: React.FC = () => {
             
             <Button 
               onClick={handleCreateAdmin} 
-              disabled={loading || !adminEmail || !adminPassword || !adminName || schemaExists !== true}
+              disabled={loading || !adminEmail || !adminPassword || !adminName}
               className="w-full"
             >
               {loading ? 'Creating...' : 'Create Admin User'}
@@ -216,7 +273,7 @@ const DatabaseSetup: React.FC = () => {
         <CardFooter>
           <Button
             onClick={handleSeedDatabase}
-            disabled={loading || schemaExists !== true}
+            disabled={loading || !schemaExists}
             className="w-full"
           >
             {loading ? 'Initializing...' : 'Initialize Database with Sample Data'}

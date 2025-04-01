@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -23,7 +23,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <SupabaseConnectionGuide />
+          <div className="bg-black p-2 text-white text-center">
+            <Link to="/db-setup" className="hover:underline">
+              Database Setup Page →
+            </Link>
+          </div>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />

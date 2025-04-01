@@ -19,12 +19,13 @@ export const executeSchema = async () => {
     
     console.log(`Found ${statements.length} SQL statements to execute`);
     
-    // Execute each statement
+    // Execute each statement directly using the REST API
     for (let i = 0; i < statements.length; i++) {
       const statement = statements[i];
       try {
-        const { error } = await supabase.rpc('pgexecute', { 
-          query: statement 
+        // Execute each SQL statement directly using Supabase SQL query
+        const { error } = await supabase.rpc('exec_sql', { 
+          sql_query: statement 
         });
         
         if (error) {
@@ -47,22 +48,26 @@ export const executeSchema = async () => {
 };
 
 /**
- * Check if the schema is already set up by checking for the existence of the users table
+ * Check if the schema is already set up by checking if any tables exist
  */
 export const isSchemaSetup = async () => {
   try {
-    const { count, error } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true });
+    // Query the information_schema to check if our tables exist
+    const { data, error } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .limit(1);
     
     if (error) {
-      console.error('Error checking if schema is set up:', error);
+      console.error('Error checking schema setup:', error);
       return false;
     }
     
-    return true; // If we got here, the table exists
+    // Return true if we have at least one table in the public schema
+    return data && data.length > 0;
   } catch (error) {
-    console.error('Exception checking if schema is set up:', error);
+    console.error('Exception checking schema setup:', error);
     return false;
   }
 };
