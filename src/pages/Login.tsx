@@ -1,15 +1,15 @@
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { User, LogIn } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -19,9 +19,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const { login, loginWithGoogle, isLoading } = useAuth();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -32,61 +30,7 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    setIsLoading(true);
-    
-    try {
-      // In a real app, this would connect to your Supabase or auth backend
-      console.log("Login attempted with:", data);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      toast({
-        title: "Login Successful",
-        description: "You have been logged in successfully.",
-      });
-      
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Login error:", error);
-      
-      toast({
-        title: "Login Failed",
-        description: "Please check your credentials and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    
-    try {
-      // In a real app, this would trigger Google OAuth via Supabase
-      console.log("Google login attempted");
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Google Login Successful",
-        description: "You have been logged in with Google successfully.",
-      });
-      
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Google login error:", error);
-      
-      toast({
-        title: "Google Login Failed",
-        description: "There was an issue logging in with Google.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await login(data.email, data.password);
   };
 
   return (
@@ -103,7 +47,7 @@ const Login = () => {
             variant="outline"
             type="button"
             className="w-full"
-            onClick={handleGoogleLogin}
+            onClick={loginWithGoogle}
             disabled={isLoading}
           >
             <User className="mr-2 h-4 w-4" />

@@ -4,8 +4,11 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { MapPin, Calendar, Clock, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Dashboard = () => {
+  const { user, logout } = useAuth();
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
@@ -14,13 +17,11 @@ const Dashboard = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-blue-600">PaddleRide</h1>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">Welcome, User</span>
-              <Link to="/">
-                <Button variant="outline" size="sm">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </Link>
+              <span className="text-gray-600">Welcome, {user?.name || 'User'}</span>
+              <Button variant="outline" size="sm" onClick={logout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>

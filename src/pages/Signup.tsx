@@ -1,16 +1,16 @@
 
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { User, UserPlus } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const signupSchema = z.object({
   fullName: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -24,9 +24,7 @@ const signupSchema = z.object({
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 const Signup = () => {
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const { signup, loginWithGoogle, isLoading } = useAuth();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -39,61 +37,7 @@ const Signup = () => {
   });
 
   const onSubmit = async (data: SignupFormValues) => {
-    setIsLoading(true);
-    
-    try {
-      // In a real app, this would connect to your Supabase or auth backend
-      console.log("Signup attempted with:", data);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      toast({
-        title: "Account Created",
-        description: "Your account has been created successfully.",
-      });
-      
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Signup error:", error);
-      
-      toast({
-        title: "Signup Failed",
-        description: "There was an issue creating your account.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleSignup = async () => {
-    setIsLoading(true);
-    
-    try {
-      // In a real app, this would trigger Google OAuth via Supabase
-      console.log("Google signup attempted");
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: "Google Signup Successful",
-        description: "Your account has been created with Google successfully.",
-      });
-      
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Google signup error:", error);
-      
-      toast({
-        title: "Google Signup Failed",
-        description: "There was an issue creating your account with Google.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    await signup(data.fullName, data.email, data.password);
   };
 
   return (
@@ -110,7 +54,7 @@ const Signup = () => {
             variant="outline"
             type="button"
             className="w-full"
-            onClick={handleGoogleSignup}
+            onClick={loginWithGoogle}
             disabled={isLoading}
           >
             <User className="mr-2 h-4 w-4" />
