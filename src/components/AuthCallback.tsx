@@ -12,27 +12,35 @@ const AuthCallback: React.FC = () => {
     const handleCallback = async () => {
       try {
         console.log("Auth callback triggered. URL:", window.location.href);
-        console.log("Hash:", window.location.hash);
-        console.log("Search params:", window.location.search);
         
+        // Handle access token from hash fragment (from OAuth redirect)
         // Get hash from either current URL or the redirected one
-        const hash = window.location.hash || location.hash;
+        let hash = window.location.hash;
+        if (!hash && window.opener && new URLSearchParams(window.location.search).has('code')) {
+          console.log("Got auth code but no hash, checking opener");
+          try {
+            if (window.opener.location.hash) {
+              hash = window.opener.location.hash;
+            }
+          } catch (e) {
+            console.error("Error accessing opener location:", e);
+          }
+        }
         
-        // Check if we have a hash fragment with tokens (direct OAuth response)
         if (hash && hash.includes('access_token')) {
-          console.log("Found OAuth hash fragment, handling directly");
+          console.log("Found hash with access_token, processing OAuth response");
           
           // Extract the hash without the # symbol
           const hashParams = new URLSearchParams(hash.substring(1));
           
-          // Get tokens from the URL
+          // Get tokens from the hash
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
           
           if (accessToken) {
-            console.log("Setting session with access token from URL");
+            console.log("Setting session with access token from hash");
             
-            // Set the session manually with the tokens
+            // Set the session manually with the tokens from hash
             const { data, error } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken || '',
@@ -44,7 +52,7 @@ const AuthCallback: React.FC = () => {
             }
             
             if (data.session) {
-              console.log("Session set successfully, checking user in database");
+              console.log("Session set successfully with user:", data.session.user.id);
               
               // Check if user exists in users table, create if not
               const { data: userData, error: userError } = await supabase
@@ -76,6 +84,7 @@ const AuthCallback: React.FC = () => {
                 title: "Authentication Successful",
                 description: "You have been logged in successfully."
               });
+              
               navigate('/dashboard');
               return;
             }

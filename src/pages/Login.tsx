@@ -38,9 +38,11 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       setOauthError(null);
+      console.log("Initiating Google login flow");
       await loginWithGoogle();
     } catch (error: any) {
       setOauthError(error.message || "Failed to login with Google");
+      console.error("Google login error:", error);
     }
   };
 
@@ -69,7 +71,7 @@ const Login = () => {
             disabled={isLoading}
           >
             <User className="mr-2 h-4 w-4" />
-            Continue with Google
+            {isLoading ? "Please wait..." : "Continue with Google"}
           </Button>
           
           <div className="relative">
@@ -143,11 +145,9 @@ const Login = () => {
                   <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs break-all">
                     <li><code className="bg-blue-100 px-1 py-0.5 rounded">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
                     <li><code className="bg-blue-100 px-1 py-0.5 rounded">http://localhost:3000/auth/callback</code></li>
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">http://localhost:8080/auth/callback</code> (for other local ports)</li>
                   </ul>
                 </li>
                 <li>Make sure the Origin URIs include <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">http://localhost:3000</code></li>
-                <li>Note: It may take up to 5 minutes for OAuth configuration changes to take effect</li>
               </ol>
             </AlertDescription>
           </Alert>
