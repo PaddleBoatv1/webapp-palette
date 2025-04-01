@@ -60,7 +60,14 @@ const AuthCallback: React.FC = () => {
             // Clean up session storage
             sessionStorage.removeItem('auth_hash');
             
+            // Process user profile
             await processUser(data.session.user.id);
+            
+            // Add a delay before redirecting to allow state updates
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 1000);
+            
             return;
           } else {
             console.error("No session established after setting token");
@@ -80,6 +87,12 @@ const AuthCallback: React.FC = () => {
         if (session) {
           console.log("Existing session found for user:", session.user.id);
           await processUser(session.user.id);
+          
+          // Add a delay before redirecting to allow state updates
+          setTimeout(() => {
+            navigate('/dashboard', { replace: true });
+          }, 1000);
+          
           return;
         }
         
@@ -101,7 +114,7 @@ const AuthCallback: React.FC = () => {
         
         // Navigate to login on error
         setTimeout(() => {
-          navigate('/login');
+          navigate('/login', { replace: true });
         }, 2000);
       } finally {
         setProcessing(false);
@@ -161,22 +174,24 @@ const AuthCallback: React.FC = () => {
           description: "You have been logged in successfully.",
         });
         
-        // Navigate to dashboard after a short delay to allow the toast to show
         console.log("Redirecting to dashboard...");
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 500);
       } catch (err) {
         console.error("Error processing user:", err);
         throw err;
       }
     };
     
-    handleCallback();
+    // Add a small delay before processing to ensure context is properly initialized
+    const timer = setTimeout(() => {
+      handleCallback();
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, [navigate, location.hash]);
 
+  // Add more visible loading and error states
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
         <div className="text-center">
           {error ? (
@@ -195,6 +210,9 @@ const AuthCallback: React.FC = () => {
             </>
           )}
         </div>
+      </div>
+      <div className="mt-4 text-sm text-gray-500">
+        If you're not redirected automatically, <button onClick={() => navigate('/dashboard')} className="text-blue-500 hover:underline">click here</button>
       </div>
     </div>
   );

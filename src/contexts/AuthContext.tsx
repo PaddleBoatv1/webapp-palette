@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
-// Define the user type
 interface User {
   id: string;
   email: string;
@@ -29,13 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Check for existing session on load
   useEffect(() => {
     const fetchSession = async () => {
       try {
         console.log("Checking for existing session...");
         
-        // Check if user has an active session
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
@@ -51,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw error;
           }
           
-          // Convert the Supabase user to our User format
           setUser({
             id: session.user.id,
             email: session.user.email || '',
@@ -72,7 +68,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     fetchSession();
     
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, session ? session.user.id : 'No user');
       
@@ -96,7 +91,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log("User data fetched successfully after sign in");
           } else if (error) {
             console.log("User not found in users table, creating one", error);
-            // If user not found in the users table, create one
             if (error.code === 'PGRST116') {
               const { error: insertError } = await supabase
                 .from('users')
@@ -105,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     id: session.user.id,
                     email: session.user.email,
                     full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
-                    role: 'customer'  // Default role
+                    role: 'customer'
                   }
                 ]);
               
@@ -134,7 +128,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
     
-    // Cleanup subscription
     return () => {
       subscription.unsubscribe();
     };
@@ -145,12 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Starting Google login flow");
       
-      // This will force Supabase to use the redirect URL configured in Supabase project
-      // Instead of relying on detecting the environment, use the Supabase-configured URL
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: undefined, // Let Supabase use its configured redirect URL
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -164,8 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       console.log("Google sign-in initiated, waiting for redirect");
-      // Don't reset isLoading here as we're redirecting to Google
-      
+      setIsLoading(false);
     } catch (error: any) {
       console.error('Google login error:', error);
       toast({
@@ -226,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
-      throw error; // Rethrow to handle in the component
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -236,7 +226,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Create user with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -250,7 +239,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       if (data.user) {
-        // Create user profile in users table
         const { error: profileError } = await supabase
           .from('users')
           .insert([
@@ -258,13 +246,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               id: data.user.id,
               email: data.user.email,
               full_name: name,
-              role: 'customer'  // Default role
+              role: 'customer'
             }
           ]);
           
         if (profileError) {
           console.error('Error creating user profile:', profileError);
-          // Continue anyway, since the auth record was created
         }
         
         setUser({
