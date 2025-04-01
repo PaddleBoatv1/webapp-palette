@@ -63,10 +63,16 @@ const AuthCallback: React.FC = () => {
             // Process user profile
             await processUser(data.session.user.id);
             
-            // Add a delay before redirecting to allow state updates
-            setTimeout(() => {
+            // Clear any existing redirect timeouts
+            if (window._redirectTimeout) {
+              clearTimeout(window._redirectTimeout);
+            }
+            
+            // Force navigation to dashboard
+            console.log("Redirecting to dashboard now");
+            window._redirectTimeout = setTimeout(() => {
               navigate('/dashboard', { replace: true });
-            }, 1000);
+            }, 500);
             
             return;
           } else {
@@ -88,10 +94,16 @@ const AuthCallback: React.FC = () => {
           console.log("Existing session found for user:", session.user.id);
           await processUser(session.user.id);
           
-          // Add a delay before redirecting to allow state updates
-          setTimeout(() => {
+          // Clear any existing redirect timeouts
+          if (window._redirectTimeout) {
+            clearTimeout(window._redirectTimeout);
+          }
+          
+          // Force navigation to dashboard
+          console.log("Redirecting to dashboard now with existing session");
+          window._redirectTimeout = setTimeout(() => {
             navigate('/dashboard', { replace: true });
-          }, 1000);
+          }, 500);
           
           return;
         }
@@ -217,5 +229,12 @@ const AuthCallback: React.FC = () => {
     </div>
   );
 };
+
+// Add a type declaration for the _redirectTimeout property on the window object
+declare global {
+  interface Window {
+    _redirectTimeout?: ReturnType<typeof setTimeout>;
+  }
+}
 
 export default AuthCallback;
