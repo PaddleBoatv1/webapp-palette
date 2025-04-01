@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -128,7 +129,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("Starting Google login flow");
       
       // Get the current origin for proper redirect
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const currentUrl = window.location.href;
+      const isLocalhost = currentUrl.includes('localhost') || currentUrl.includes('127.0.0.1');
+      
+      // Use the appropriate redirect URL based on environment
+      const redirectUrl = isLocalhost 
+        ? `${window.location.origin}/auth/callback` 
+        : 'https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback';
+      
       console.log("Using redirect URL:", redirectUrl);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -145,7 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error("Google sign-in error:", error);
         // Check for the specific error about the provider not being enabled
-        if (error.message.includes('provider is not enabled')) {
+        if (error.message && error.message.includes('provider is not enabled')) {
           throw new Error('Google authentication is not enabled in your Supabase project. Please enable the Google provider in Authentication -> Providers and configure it with your Google OAuth credentials. Make sure to add the Supabase callback URL to your Google OAuth allowed redirect URIs.');
         }
         throw error;

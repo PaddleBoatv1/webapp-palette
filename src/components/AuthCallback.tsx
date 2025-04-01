@@ -1,28 +1,33 @@
 
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
         console.log("Auth callback triggered. URL:", window.location.href);
+        console.log("Hash:", window.location.hash);
+        console.log("Search params:", window.location.search);
+        
+        // Get hash from either current URL or the redirected one
+        const hash = window.location.hash || location.hash;
         
         // Check if we have a hash fragment with tokens (direct OAuth response)
-        if (window.location.hash && window.location.hash.includes('access_token')) {
+        if (hash && hash.includes('access_token')) {
           console.log("Found OAuth hash fragment, handling directly");
           
           // Extract the hash without the # symbol
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const hashParams = new URLSearchParams(hash.substring(1));
           
           // Get tokens from the URL
           const accessToken = hashParams.get('access_token');
           const refreshToken = hashParams.get('refresh_token');
-          const providerToken = hashParams.get('provider_token');
           
           if (accessToken) {
             console.log("Setting session with access token from URL");
@@ -119,7 +124,7 @@ const AuthCallback: React.FC = () => {
         } else {
           console.log("No session found after OAuth redirect");
           // Check URL for errors from the OAuth provider
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const hashParams = new URLSearchParams(hash.substring(1));
           const queryParams = new URLSearchParams(window.location.search);
           
           const error = queryParams.get('error') || hashParams.get('error');
@@ -145,7 +150,7 @@ const AuthCallback: React.FC = () => {
     };
     
     handleCallback();
-  }, [navigate]);
+  }, [navigate, location]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

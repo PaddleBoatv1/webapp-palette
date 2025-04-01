@@ -135,16 +135,18 @@ const Login = () => {
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-sm text-gray-700">
-              <p className="font-semibold mb-1">Google Sign-In Setup Guide:</p>
+              <p className="font-semibold mb-1">Google Sign-In Setup Checklist:</p>
               <ol className="list-decimal list-inside space-y-1 pl-1">
                 <li>Enable Google provider in Supabase Authentication → Providers</li>
                 <li>Add your Google OAuth credentials (Client ID & Secret)</li>
-                <li>Add these callback URLs to your Google OAuth settings:
-                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded text-xs">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded text-xs">{window.location.origin}/auth/callback</code></li>
+                <li>Add these callback URLs to your Google OAuth Authorized redirect URIs:
+                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs break-all">
+                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
+                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">http://localhost:3000/auth/callback</code></li>
+                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">http://localhost:8080/auth/callback</code> (for other local ports)</li>
                   </ul>
                 </li>
+                <li>Make sure the Origin URIs include <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">http://localhost:3000</code></li>
                 <li>Note: It may take up to 5 minutes for OAuth configuration changes to take effect</li>
               </ol>
             </AlertDescription>
