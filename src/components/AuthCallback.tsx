@@ -29,13 +29,32 @@ const AuthCallback: React.FC = () => {
         if (error) {
           console.error('OAuth error:', error);
           const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
+          
+          // If the error is about the provider not being enabled, give a more helpful message
+          if (errorDescription?.includes('provider is not enabled')) {
+            throw new Error('Google authentication is not enabled in your Supabase project. Please configure the Google provider in your Supabase dashboard.');
+          }
+          
           throw new Error(errorDescription || 'Authentication failed');
         }
         
-        // If we got here without a token or error, likely still in progress
-        // Supabase handles the session automatically
-        // We can just redirect to dashboard and the AuthContext will check the session
-        navigate('/dashboard');
+        // If we got here without a token or error, let's get the session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          throw sessionError;
+        }
+        
+        if (session) {
+          toast({
+            title: "Authentication Successful",
+            description: "You have been logged in successfully."
+          });
+          navigate('/dashboard');
+        } else {
+          // No session found, redirect back to login
+          navigate('/login');
+        }
       } catch (error: any) {
         console.error('Error processing OAuth callback:', error);
         toast({
@@ -55,6 +74,7 @@ const AuthCallback: React.FC = () => {
       <div className="text-center">
         <h1 className="text-2xl font-bold mb-4">Authenticating...</h1>
         <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+        <p className="mt-4 text-gray-500">You will be redirected shortly...</p>
       </div>
     </div>
   );

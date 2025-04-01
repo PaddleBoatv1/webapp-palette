@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -110,13 +109,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('provider is not enabled')) {
+          throw new Error('Google authentication is not enabled. Please configure Google provider in your Supabase project.');
+        }
+        throw error;
+      }
       
-    } catch (error) {
+      // No need to set user here as the auth state change listener will handle it
+      // after redirect back from Google
+      
+    } catch (error: any) {
       console.error('Google login error:', error);
       toast({
         title: "Login Failed",
-        description: "There was an issue logging in with Google.",
+        description: error.message || "There was an issue logging in with Google.",
         variant: "destructive",
       });
     } finally {

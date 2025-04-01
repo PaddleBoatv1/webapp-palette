@@ -9,8 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { User, UserPlus } from "lucide-react";
+import { User, UserPlus, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const signupSchema = z.object({
   fullName: z.string().min(2, { message: "Name must be at least 2 characters" }),
@@ -25,6 +26,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 const Signup = () => {
   const { signup, loginWithGoogle, isLoading } = useAuth();
+  const [oauthError, setOauthError] = React.useState<string | null>(null);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -40,6 +42,15 @@ const Signup = () => {
     await signup(data.fullName, data.email, data.password);
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setOauthError(null);
+      await loginWithGoogle();
+    } catch (error: any) {
+      setOauthError(error.message || "Failed to login with Google");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
@@ -50,11 +61,18 @@ const Signup = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {oauthError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{oauthError}</AlertDescription>
+            </Alert>
+          )}
+          
           <Button
             variant="outline"
             type="button"
             className="w-full"
-            onClick={loginWithGoogle}
+            onClick={handleGoogleLogin}
             disabled={isLoading}
           >
             <User className="mr-2 h-4 w-4" />
@@ -155,6 +173,13 @@ const Signup = () => {
               </Button>
             </form>
           </Form>
+          
+          <div className="text-sm text-center text-gray-500 mt-4">
+            <p>
+              <span className="font-semibold">Note:</span> To use Google Sign-In, make sure you have enabled the Google provider 
+              in your Supabase project and configured the correct OAuth credentials.
+            </p>
+          </div>
         </CardContent>
         <CardFooter>
           <div className="text-sm text-center w-full text-gray-500">
