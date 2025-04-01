@@ -15,10 +15,17 @@ const AuthCallback: React.FC = () => {
       try {
         console.log("Auth callback triggered. Processing auth response...");
         console.log("Current URL:", window.location.href);
-        console.log("Hash present:", !!location.hash);
         
-        // Get the hash fragment from the URL
+        // First try to get the hash from the URL
         let hash = location.hash;
+        
+        // If no hash in the URL, check session storage (it might have been stored there during redirect)
+        if (!hash && sessionStorage.getItem('auth_hash')) {
+          hash = sessionStorage.getItem('auth_hash') || '';
+          console.log("Retrieved hash from session storage");
+        }
+        
+        console.log("Hash present:", !!hash);
         
         // If we have a hash with access_token, process it
         if (hash && hash.includes('access_token')) {
@@ -49,6 +56,10 @@ const AuthCallback: React.FC = () => {
           
           if (data.session) {
             console.log("Session established with user:", data.session.user.id);
+            
+            // Clean up session storage
+            sessionStorage.removeItem('auth_hash');
+            
             await processUser(data.session.user.id);
             return;
           } else {
@@ -84,6 +95,9 @@ const AuthCallback: React.FC = () => {
           description: error.message || "There was an issue with the authentication flow",
           variant: "destructive",
         });
+        
+        // Clean up session storage on error
+        sessionStorage.removeItem('auth_hash');
         
         // Navigate to login on error
         setTimeout(() => {

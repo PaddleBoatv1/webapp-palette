@@ -146,9 +146,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Starting Google login flow");
       
+      // Determine if we're in a production environment based on the hostname
+      const isProduction = 
+        window.location.hostname !== 'localhost' && 
+        window.location.hostname !== '127.0.0.1';
+      
       // Get the current origin for proper redirect
-      const origin = window.location.origin;
-      console.log("Current origin:", origin);
+      const origin = isProduction
+        ? window.location.origin // Use the current hostname in production
+        : 'http://localhost:3000'; // Fallback to localhost for development
+      
+      console.log("Detected environment:", isProduction ? "production" : "development");
+      console.log("Using origin for redirect:", origin);
       
       // Use the exact URL based on the current origin
       const redirectUrl = `${origin}/auth/callback`;

@@ -25,8 +25,18 @@ const AccessTokenRedirect = () => {
     // Check if there's an access token in the URL hash
     if (location.hash && location.hash.includes('access_token')) {
       console.log("Found access_token in hash, redirecting to auth callback");
-      // Preserve the hash when redirecting
-      navigate(`/auth/callback${location.hash}`, { replace: true });
+      
+      try {
+        // Store the token in session storage to preserve it across redirects
+        sessionStorage.setItem('auth_hash', location.hash);
+        
+        // Preserve the hash when redirecting
+        navigate(`/auth/callback`, { replace: true });
+      } catch (error) {
+        console.error("Error handling OAuth redirect:", error);
+        // If there's an error with session storage, try direct navigation
+        navigate(`/auth/callback${location.hash}`, { replace: true });
+      }
     }
   }, [location.hash, navigate]);
   
