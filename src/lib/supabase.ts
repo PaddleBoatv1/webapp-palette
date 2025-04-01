@@ -1,6 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+// Check for environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -8,11 +9,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
 }
 
+// Create a dummy client if environment variables are not set (for development only)
+// This prevents the app from crashing but won't actually connect to Supabase
+const isDevelopment = import.meta.env.DEV;
+const dummyUrl = 'https://placeholder-url.supabase.co';
+const dummyKey = 'dummy-key-for-development-only';
+
 export const supabase = createClient(
-  supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseUrl || (isDevelopment ? dummyUrl : ''),
+  supabaseAnonKey || (isDevelopment ? dummyKey : '')
 );
 
+// Create a helper function to check if Supabase is properly configured
+export const isSupabaseConfigured = () => {
+  return !!supabaseUrl && !!supabaseAnonKey;
+};
+
+// Types for database tables
 export type User = {
   id: string;
   email: string;
