@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 
 // Seed a sample waiver
@@ -131,12 +130,12 @@ export const createAdminUser = async (email: string, password: string, fullName:
   
   if (authError) {
     console.error('Error creating admin auth user:', authError);
-    return null;
+    throw authError;
   }
   
   if (!authData.user) {
     console.error('No user returned from auth signup');
-    return null;
+    throw new Error('No user returned from auth signup');
   }
   
   // 2. Create the user profile with admin role
@@ -155,7 +154,7 @@ export const createAdminUser = async (email: string, password: string, fullName:
     
   if (userError) {
     console.error('Error creating admin user profile:', userError);
-    return null;
+    throw userError;
   }
   
   return userData;

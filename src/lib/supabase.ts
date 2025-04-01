@@ -1,28 +1,15 @@
-
 import { createClient } from '@supabase/supabase-js';
 
-// Check for environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Use direct credentials for this project
+const supabaseUrl = 'https://vstqtcvwnvkcdrxteubg.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdHF0Y3Z3bnZrY2RyeHRldWJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1MTk0NDcsImV4cCI6MjA1OTA5NTQ0N30.NdXDXoEyNmW309tSXCTiFu_MPmpP1TrD0FKPgf-nK2w';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-}
+// Create the Supabase client with the provided credentials
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Create a dummy client if environment variables are not set (for development only)
-// This prevents the app from crashing but won't actually connect to Supabase
-const isDevelopment = import.meta.env.DEV;
-const dummyUrl = 'https://placeholder-url.supabase.co';
-const dummyKey = 'dummy-key-for-development-only';
-
-export const supabase = createClient(
-  supabaseUrl || (isDevelopment ? dummyUrl : ''),
-  supabaseAnonKey || (isDevelopment ? dummyKey : '')
-);
-
-// Create a helper function to check if Supabase is properly configured
+// Helper function to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
-  return !!supabaseUrl && !!supabaseAnonKey;
+  return true; // We're now using hardcoded credentials, so it's always configured
 };
 
 // Types for database tables
