@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -27,7 +26,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   // Check for existing session on load
@@ -35,18 +34,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchSession = async () => {
       try {
         setIsLoading(true);
+        console.log("Checking for existing session...");
         
         // Check if user has an active session
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
+          console.log("Found existing session for user:", session.user.id);
           const { data: userData, error } = await supabase
             .from('users')
             .select('*')
             .eq('id', session.user.id)
             .single();
             
-          if (error) throw error;
+          if (error) {
+            console.error("Error fetching user data:", error);
+            throw error;
+          }
           
           // Convert the Supabase user to our User format
           setUser({
@@ -56,6 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             photoUrl: session.user.user_metadata?.avatar_url,
             role: userData?.role
           });
+          console.log("User set from existing session");
+        } else {
+          console.log("No existing session found");
         }
       } catch (error) {
         console.error('Error checking session:', error);
@@ -72,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (event === 'SIGNED_IN' && session) {
         try {
+          setIsLoading(true);
           const { data: userData, error } = await supabase
             .from('users')
             .select('*')
@@ -86,7 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               photoUrl: session.user.user_metadata?.avatar_url,
               role: userData?.role
             });
+            console.log("User data fetched successfully after sign in");
           } else if (error) {
+            console.log("User not found in users table, creating one", error);
             // If user not found in the users table, create one
             if (error.code === 'PGRST116') {
               const { error: insertError } = await supabase
@@ -101,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ]);
               
               if (!insertError) {
+                console.log("Created new user record in users table");
                 setUser({
                   id: session.user.id,
                   email: session.user.email || '',
@@ -108,13 +119,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   photoUrl: session.user.user_metadata?.avatar_url,
                   role: 'customer'
                 });
+              } else {
+                console.error("Error creating user record:", insertError);
               }
             }
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
+        } finally {
+          setIsLoading(false);
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log("User signed out");
         setUser(null);
       }
     });
@@ -158,6 +174,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // No need to set user here as the auth state change listener will handle it
       // after redirect back from Google
       
+      // Don't reset isLoading here as we're redirecting to Google
+      
     } catch (error: any) {
       console.error('Google login error:', error);
       toast({
@@ -172,15 +190,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      console.log("Attempting email/password login");
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Login error:", error);
+        throw error;
+      }
       
       if (data.user) {
+        console.log("Login successful for user:", data.user.id);
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
@@ -194,6 +217,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             name: userData.full_name || data.user.email?.split('@')[0] || '',
             role: userData.role
           });
+          console.log("User data fetched successfully");
+        } else {
+          console.log("User data not found, using basic data");
         }
         
         toast({
@@ -210,6 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
+      throw error; // Rethrow to handle in the component
     } finally {
       setIsLoading(false);
     }

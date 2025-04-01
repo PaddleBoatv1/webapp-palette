@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,13 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 const Login = () => {
   const { login, loginWithGoogle, isLoading } = useAuth();
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [localLoading, setLocalLoading] = useState(false);
+
+  // Reset loading state when component mounts
+  useEffect(() => {
+    // This will ensure the page isn't stuck in a loading state when it first loads
+    setLocalLoading(false);
+  }, []);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -32,19 +39,31 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    await login(data.email, data.password);
+    setLocalLoading(true);
+    try {
+      await login(data.email, data.password);
+    } catch (error) {
+      // Error handling is already in the login function
+    } finally {
+      setLocalLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
     try {
       setOauthError(null);
+      setLocalLoading(true);
       console.log("Initiating Google login flow");
       await loginWithGoogle();
     } catch (error: any) {
       setOauthError(error.message || "Failed to login with Google");
       console.error("Google login error:", error);
+      setLocalLoading(false);
     }
   };
+
+  // Determine if we should show loading state
+  const showLoading = localLoading || isLoading;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -68,10 +87,10 @@ const Login = () => {
             type="button"
             className="w-full"
             onClick={handleGoogleLogin}
-            disabled={isLoading}
+            disabled={showLoading}
           >
             <User className="mr-2 h-4 w-4" />
-            {isLoading ? "Please wait..." : "Continue with Google"}
+            {showLoading ? "Please wait..." : "Continue with Google"}
           </Button>
           
           <div className="relative">
@@ -115,8 +134,8 @@ const Login = () => {
                 )}
               />
               
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? (
+              <Button type="submit" className="w-full" disabled={showLoading}>
+                {showLoading ? (
                   <div className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

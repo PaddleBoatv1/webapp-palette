@@ -8,6 +8,7 @@ const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(true);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -88,6 +89,8 @@ const AuthCallback: React.FC = () => {
         setTimeout(() => {
           navigate('/login');
         }, 2000);
+      } finally {
+        setProcessing(false);
       }
     };
     
@@ -172,7 +175,9 @@ const AuthCallback: React.FC = () => {
             <>
               <h1 className="text-2xl font-bold mb-4">Authenticating...</h1>
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
-              <p className="mt-4 text-gray-500">Please wait while we complete your authentication</p>
+              <p className="mt-4 text-gray-500">
+                {processing ? "Please wait while we complete your authentication" : "Authentication complete, redirecting..."}
+              </p>
             </>
           )}
         </div>
