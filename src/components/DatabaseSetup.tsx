@@ -273,7 +273,7 @@ $function$;`}
             
             <Button 
               onClick={handleCreateAdmin} 
-              disabled={loading || !adminEmail || !adminPassword || !adminName || !schemaExists || password.length < 6}
+              disabled={loading || !adminEmail || !adminPassword || !adminName || !schemaExists || adminPassword.length < 6}
               className="w-full"
             >
               {loading ? 'Creating...' : 'Create Admin User'}
