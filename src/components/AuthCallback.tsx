@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -7,154 +7,157 @@ import { supabase } from '@/lib/supabase';
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        console.log("Auth callback triggered. URL:", window.location.href);
+        console.log("Auth callback triggered. Processing auth response...");
         
-        // Handle access token from hash fragment (from OAuth redirect)
-        // Get hash from either current URL or the redirected one
+        // Get the hash fragment (from the current URL or original window)
         let hash = window.location.hash;
-        if (!hash && window.opener && new URLSearchParams(window.location.search).has('code')) {
-          console.log("Got auth code but no hash, checking opener");
-          try {
-            if (window.opener.location.hash) {
-              hash = window.opener.location.hash;
-            }
-          } catch (e) {
-            console.error("Error accessing opener location:", e);
-          }
-        }
+        let search = window.location.search;
         
-        if (hash && hash.includes('access_token')) {
-          console.log("Found hash with access_token, processing OAuth response");
-          
-          // Extract the hash without the # symbol
-          const hashParams = new URLSearchParams(hash.substring(1));
-          
-          // Get tokens from the hash
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          
-          if (accessToken) {
-            console.log("Setting session with access token from hash");
-            
-            // Set the session manually with the tokens from hash
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken || '',
-            });
+        // Get hash from current URL or via the redirected URL
+        if (!hash && search && search.includes('code=')) {
+          console.log("OAuth code found in search params, checking for hash...");
+          // We might be in a code flow without hash
+          const params = new URLSearchParams(search);
+          if (params.has('code')) {
+            // Let Supabase exchange the code
+            console.log("Letting Supabase handle code exchange...");
+            const { data, error } = await supabase.auth.getSession();
             
             if (error) {
-              console.error("Error setting session:", error);
+              console.error("Error getting session from code:", error);
               throw error;
             }
             
             if (data.session) {
-              console.log("Session set successfully with user:", data.session.user.id);
-              
-              // Check if user exists in users table, create if not
-              const { data: userData, error: userError } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', data.session.user.id)
-                .single();
-                
-              if (userError && userError.code === 'PGRST116') {
-                // User not found in table, create a profile
-                console.log("Creating user profile in users table");
-                const { error: insertError } = await supabase
-                  .from('users')
-                  .insert([
-                    {
-                      id: data.session.user.id,
-                      email: data.session.user.email,
-                      full_name: data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || '',
-                      role: 'customer'  // Default role
-                    }
-                  ]);
-                  
-                if (insertError) {
-                  console.error("Error creating user profile:", insertError);
-                }
-              }
-              
-              toast({
-                title: "Authentication Successful",
-                description: "You have been logged in successfully."
-              });
-              
-              navigate('/dashboard');
+              console.log("Session established from code flow:", data.session.user.id);
+              await processUser(data.session.user.id);
               return;
             }
           }
         }
         
-        // If no hash parameters or session setting failed, try the normal flow
-        console.log("Trying standard Supabase getSession flow");
+        // If we have a hash with access_token, process it
+        if (hash && hash.includes('access_token')) {
+          console.log("Found access_token in hash, processing...");
+          
+          // Extract token from hash (remove # at start)
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          
+          if (!accessToken) {
+            throw new Error("Access token not found in URL");
+          }
+          
+          console.log("Setting session with token from hash");
+          
+          // Set the session with tokens from URL
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+          
+          if (error) {
+            console.error("Error setting session with token:", error);
+            throw error;
+          }
+          
+          if (data.session) {
+            console.log("Session established with user:", data.session.user.id);
+            await processUser(data.session.user.id);
+            return;
+          } else {
+            throw new Error("Failed to establish session with token");
+          }
+        }
+        
+        // Fallback: try to get existing session
+        console.log("No token in URL, checking for existing session");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error("Session error:", sessionError);
+          console.error("Error getting existing session:", sessionError);
           throw sessionError;
         }
         
         if (session) {
-          console.log("Session found, user authenticated successfully");
-          
-          // Check if user exists in users table, create if not
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (userError && userError.code === 'PGRST116') {
-            // User not found in table, create a profile
-            console.log("Creating user profile in users table");
-            await supabase
-              .from('users')
-              .insert([
-                {
-                  id: session.user.id,
-                  email: session.user.email,
-                  full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
-                  role: 'customer'  // Default role
-                }
-              ]);
-          }
-          
-          toast({
-            title: "Authentication Successful",
-            description: "You have been logged in successfully."
-          });
-          navigate('/dashboard');
-        } else {
-          console.log("No session found after OAuth redirect");
-          // Check URL for errors from the OAuth provider
-          const hashParams = new URLSearchParams(hash.substring(1));
-          const queryParams = new URLSearchParams(window.location.search);
-          
-          const error = queryParams.get('error') || hashParams.get('error');
-          if (error) {
-            console.error('OAuth error from URL:', error);
-            const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
-            
-            throw new Error(errorDescription || 'Authentication failed');
-          }
-          
-          // No error but no session either - redirect back to login
-          navigate('/login');
+          console.log("Existing session found for user:", session.user.id);
+          await processUser(session.user.id);
+          return;
         }
+        
+        // If we got here, authentication failed
+        console.log("No session could be established");
+        throw new Error("Authentication failed");
+        
       } catch (error: any) {
-        console.error('Error processing OAuth callback:', error);
+        console.error("Authentication callback error:", error);
+        setError(error.message || "Authentication failed");
         toast({
           title: "Authentication Failed",
-          description: error.message || "There was an issue authenticating with Google. Please ensure Google authentication is enabled in your Supabase project.",
+          description: error.message || "There was an issue with the authentication flow",
           variant: "destructive",
         });
-        navigate('/login');
+        
+        // Wait a moment before redirecting on error
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }
+    };
+    
+    // Helper function to ensure user exists in the users table
+    const processUser = async (userId: string) => {
+      try {
+        // Check if user exists in users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+          
+        // If user not found, create profile
+        if (userError && userError.code === 'PGRST116') {
+          console.log("User not found in users table, creating profile");
+          
+          // Get user details from auth
+          const { data: authData } = await supabase.auth.getUser();
+          if (!authData.user) throw new Error("User data not available");
+          
+          // Insert user into users table
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert([{
+              id: userId,
+              email: authData.user.email,
+              full_name: authData.user.user_metadata?.full_name || 
+                         authData.user.user_metadata?.name || 
+                         authData.user.email?.split('@')[0] || '',
+              role: 'customer' // Default role
+            }]);
+            
+          if (insertError) {
+            console.error("Error creating user profile:", insertError);
+            // Continue anyway as auth is successful
+          }
+        }
+        
+        // Show success toast and redirect
+        toast({
+          title: "Authentication Successful",
+          description: "You have been logged in successfully.",
+        });
+        
+        // Navigate to dashboard
+        navigate('/dashboard');
+      } catch (err) {
+        console.error("Error processing user:", err);
+        throw err;
       }
     };
     
@@ -162,11 +165,23 @@ const AuthCallback: React.FC = () => {
   }, [navigate, location]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold mb-4">Authenticating...</h1>
-        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
-        <p className="mt-4 text-gray-500">You will be redirected shortly...</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+        <div className="text-center">
+          {error ? (
+            <>
+              <h1 className="text-2xl font-bold text-red-600 mb-4">Authentication Error</h1>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <div className="animate-pulse text-sm text-gray-500">Redirecting to login page...</div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold mb-4">Authenticating...</h1>
+              <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+              <p className="mt-4 text-gray-500">Please wait while we complete your authentication</p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

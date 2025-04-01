@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -15,13 +15,19 @@ import DatabaseSetup from "./components/DatabaseSetup";
 
 const queryClient = new QueryClient();
 
-const App = () => {
-  // Check if URL has access_token in hash and redirect to auth callback
-  const hashParams = new URLSearchParams(window.location.hash.substring(1));
-  if (hashParams.has('access_token')) {
+// Component to handle access token redirects
+const AccessTokenRedirect = () => {
+  const location = useLocation();
+  
+  // If URL has access_token in hash, navigate to auth callback
+  if (location.hash && location.hash.includes('access_token')) {
     return <Navigate to="/auth/callback" replace />;
   }
+  
+  return null;
+};
 
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -34,13 +40,14 @@ const App = () => {
                 Database Setup Page →
               </Link>
             </div>
+            
             <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<><AccessTokenRedirect /><Index /></>} />
+              <Route path="/login" element={<><AccessTokenRedirect /><Login /></>} />
+              <Route path="/signup" element={<><AccessTokenRedirect /><Signup /></>} />
+              <Route path="/dashboard" element={<><AccessTokenRedirect /><Dashboard /></>} />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/#access_token=:token" element={<AuthCallback />} />
+              <Route path="/*" element={<AccessTokenRedirect />} /> {/* Catch-all for token redirects */}
               <Route path="/db-setup" element={<DatabaseSetup />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
