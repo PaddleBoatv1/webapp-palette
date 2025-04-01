@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -126,15 +125,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     try {
       setIsLoading(true);
+      console.log("Starting Google login flow");
+      
+      // Get the current origin for proper redirect
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      console.log("Using redirect URL:", redirectUrl);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
         }
       });
       
       if (error) {
+        console.error("Google sign-in error:", error);
         // Check for the specific error about the provider not being enabled
         if (error.message.includes('provider is not enabled')) {
           throw new Error('Google authentication is not enabled in your Supabase project. Please enable the Google provider in Authentication -> Providers and configure it with your Google OAuth credentials. Make sure to add the Supabase callback URL to your Google OAuth allowed redirect URIs.');
@@ -142,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
+      console.log("Google sign-in initiated, waiting for redirect");
       // No need to set user here as the auth state change listener will handle it
       // after redirect back from Google
       
@@ -152,7 +162,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: error.message || "There was an issue logging in with Google.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };

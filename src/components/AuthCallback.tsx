@@ -10,9 +10,75 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        console.log("Auth callback triggered. Checking session...");
+        console.log("Auth callback triggered. URL:", window.location.href);
         
-        // Get the session directly - this should be populated after OAuth redirect
+        // Check if we have a hash fragment with tokens (direct OAuth response)
+        if (window.location.hash && window.location.hash.includes('access_token')) {
+          console.log("Found OAuth hash fragment, handling directly");
+          
+          // Extract the hash without the # symbol
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          
+          // Get tokens from the URL
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          const providerToken = hashParams.get('provider_token');
+          
+          if (accessToken) {
+            console.log("Setting session with access token from URL");
+            
+            // Set the session manually with the tokens
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '',
+            });
+            
+            if (error) {
+              console.error("Error setting session:", error);
+              throw error;
+            }
+            
+            if (data.session) {
+              console.log("Session set successfully, checking user in database");
+              
+              // Check if user exists in users table, create if not
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', data.session.user.id)
+                .single();
+                
+              if (userError && userError.code === 'PGRST116') {
+                // User not found in table, create a profile
+                console.log("Creating user profile in users table");
+                const { error: insertError } = await supabase
+                  .from('users')
+                  .insert([
+                    {
+                      id: data.session.user.id,
+                      email: data.session.user.email,
+                      full_name: data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || '',
+                      role: 'customer'  // Default role
+                    }
+                  ]);
+                  
+                if (insertError) {
+                  console.error("Error creating user profile:", insertError);
+                }
+              }
+              
+              toast({
+                title: "Authentication Successful",
+                description: "You have been logged in successfully."
+              });
+              navigate('/dashboard');
+              return;
+            }
+          }
+        }
+        
+        // If no hash parameters or session setting failed, try the normal flow
+        console.log("Trying standard Supabase getSession flow");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
