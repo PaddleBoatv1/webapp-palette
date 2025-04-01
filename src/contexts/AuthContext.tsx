@@ -146,27 +146,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       console.log("Starting Google login flow");
       
-      // Determine if we're in a production environment based on the hostname
-      const isProduction = 
-        window.location.hostname !== 'localhost' && 
-        window.location.hostname !== '127.0.0.1';
-      
-      // Get the current origin for proper redirect
-      const origin = isProduction
-        ? window.location.origin // Use the current hostname in production
-        : 'http://localhost:3000'; // Fallback to localhost for development
-      
-      console.log("Detected environment:", isProduction ? "production" : "development");
-      console.log("Using origin for redirect:", origin);
-      
-      // Use the exact URL based on the current origin
-      const redirectUrl = `${origin}/auth/callback`;
-      console.log("Using redirect URL:", redirectUrl);
-      
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Get the correct redirect URL from Supabase
+      // This ensures we use the URL configured in Supabase's Google OAuth settings
+      const { data, error } = await supabase.auth.getOAuthSignInURL({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -175,13 +159,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (error) {
-        console.error("Google sign-in error:", error);
+        console.error("Error generating OAuth URL:", error);
         throw error;
       }
       
-      console.log("Google sign-in initiated, waiting for redirect");
-      // No need to set user here as the auth state change listener will handle it
-      // after redirect back from Google
+      if (data && data.url) {
+        console.log("Generated OAuth URL:", data.url);
+        // Directly redirect to the Supabase-generated URL
+        window.location.href = data.url;
+      } else {
+        throw new Error("Failed to generate OAuth signin URL");
+      }
       
       // Don't reset isLoading here as we're redirecting to Google
       
