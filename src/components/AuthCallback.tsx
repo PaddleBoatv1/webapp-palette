@@ -10,56 +10,68 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Get the authorization code from the URL
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const queryParams = new URLSearchParams(window.location.search);
+        console.log("Auth callback triggered. Checking session...");
         
-        // Check if there's an access_token (successful login)
-        if (hashParams.has('access_token')) {
-          toast({
-            title: "Authentication Successful",
-            description: "You have been logged in successfully."
-          });
-          navigate('/dashboard');
-          return;
-        }
-        
-        // Check if there's an error
-        const error = queryParams.get('error') || hashParams.get('error');
-        if (error) {
-          console.error('OAuth error:', error);
-          const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
-          
-          // If the error is about the provider not being enabled, give a more helpful message
-          if (errorDescription?.includes('provider is not enabled')) {
-            throw new Error('Google authentication is not enabled in your Supabase project. Please configure the Google provider in your Supabase dashboard.');
-          }
-          
-          throw new Error(errorDescription || 'Authentication failed');
-        }
-        
-        // If we got here without a token or error, let's get the session
+        // Get the session directly - this should be populated after OAuth redirect
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
+          console.error("Session error:", sessionError);
           throw sessionError;
         }
         
         if (session) {
+          console.log("Session found, user authenticated successfully");
+          
+          // Check if user exists in users table, create if not
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (userError && userError.code === 'PGRST116') {
+            // User not found in table, create a profile
+            console.log("Creating user profile in users table");
+            await supabase
+              .from('users')
+              .insert([
+                {
+                  id: session.user.id,
+                  email: session.user.email,
+                  full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+                  role: 'customer'  // Default role
+                }
+              ]);
+          }
+          
           toast({
             title: "Authentication Successful",
             description: "You have been logged in successfully."
           });
           navigate('/dashboard');
         } else {
-          // No session found, redirect back to login
+          console.log("No session found after OAuth redirect");
+          // Check URL for errors from the OAuth provider
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const queryParams = new URLSearchParams(window.location.search);
+          
+          const error = queryParams.get('error') || hashParams.get('error');
+          if (error) {
+            console.error('OAuth error from URL:', error);
+            const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
+            
+            throw new Error(errorDescription || 'Authentication failed');
+          }
+          
+          // No error but no session either - redirect back to login
           navigate('/login');
         }
       } catch (error: any) {
         console.error('Error processing OAuth callback:', error);
         toast({
           title: "Authentication Failed",
-          description: error.message || "There was an issue authenticating.",
+          description: error.message || "There was an issue authenticating with Google. Please ensure Google authentication is enabled in your Supabase project.",
           variant: "destructive",
         });
         navigate('/login');

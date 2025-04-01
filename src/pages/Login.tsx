@@ -8,7 +8,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { User, LogIn, AlertCircle } from "lucide-react";
+import { User, LogIn, AlertCircle, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -132,12 +132,17 @@ const Login = () => {
             </form>
           </Form>
           
-          <div className="text-sm text-center text-gray-500 mt-4">
-            <p>
-              <span className="font-semibold">Note:</span> To use Google Sign-In, make sure you have enabled the Google provider 
-              in your Supabase project and configured the correct OAuth credentials.
-            </p>
-          </div>
+          <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-sm text-gray-700">
+              <p className="font-semibold mb-1">Google Sign-In Setup Guide:</p>
+              <ol className="list-decimal list-inside space-y-1 pl-1">
+                <li>Enable Google provider in Supabase Authentication → Providers</li>
+                <li>Add your Google OAuth credentials (Client ID & Secret)</li>
+                <li>Add this callback URL to your Google OAuth settings: <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
+              </ol>
+            </AlertDescription>
+          </Alert>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <div className="text-sm text-center text-gray-500">

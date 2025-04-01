@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -83,6 +84,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               photoUrl: session.user.user_metadata?.avatar_url,
               role: userData?.role
             });
+          } else if (error) {
+            // If user not found in the users table, create one
+            if (error.code === 'PGRST116') {
+              const { error: insertError } = await supabase
+                .from('users')
+                .insert([
+                  {
+                    id: session.user.id,
+                    email: session.user.email,
+                    full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+                    role: 'customer'  // Default role
+                  }
+                ]);
+              
+              if (!insertError) {
+                setUser({
+                  id: session.user.id,
+                  email: session.user.email || '',
+                  name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+                  photoUrl: session.user.user_metadata?.avatar_url,
+                  role: 'customer'
+                });
+              }
+            }
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -110,8 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (error) {
+        // Check for the specific error about the provider not being enabled
         if (error.message.includes('provider is not enabled')) {
-          throw new Error('Google authentication is not enabled. Please configure Google provider in your Supabase project.');
+          throw new Error('Google authentication is not enabled in your Supabase project. Please enable the Google provider in Authentication -> Providers and configure it with your Google OAuth credentials. Make sure to add the Supabase callback URL to your Google OAuth allowed redirect URIs.');
         }
         throw error;
       }
