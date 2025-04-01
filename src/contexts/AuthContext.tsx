@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 // Define the user type
 interface User {
@@ -9,6 +10,7 @@ interface User {
   email: string;
   name: string;
   photoUrl?: string;
+  role?: string;
 }
 
 interface AuthContextType {
@@ -18,7 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,32 +30,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Check for existing session on load
   useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    const fetchSession = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Check if user has an active session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (error) throw error;
+          
+          // Convert the Supabase user to our User format
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            name: userData?.full_name || session.user.email?.split('@')[0] || '',
+            photoUrl: session.user.user_metadata?.avatar_url,
+            role: userData?.role
+          });
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchSession();
+    
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        try {
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (!error && userData) {
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              name: userData?.full_name || session.user.email?.split('@')[0] || '',
+              photoUrl: session.user.user_metadata?.avatar_url,
+              role: userData?.role
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+    
+    // Cleanup subscription
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loginWithGoogle = async () => {
     try {
       setIsLoading(true);
       
-      // Google OAuth configuration
-      const clientId = "488997556389-n7rpv9m3l5l1ti44lbngh95pkm23n7ab.apps.googleusercontent.com";
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
       
-      // Redirect to Google's OAuth page
-      const redirectUri = encodeURIComponent('http://localhost:8080/auth/callback');
-      const scope = encodeURIComponent('email profile');
-      const responseType = 'code';
-      const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=${responseType}`;
-      
-      window.location.href = authUrl;
-      
-      // Note: The callback will handle the rest of the authentication process
-      // See the AuthCallback component we'll create next
+      if (error) throw error;
       
     } catch (error) {
       console.error('Google login error:', error);
@@ -62,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "There was an issue logging in with Google.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -70,30 +128,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Simulate a login API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For demo purposes, create a mock user
-      const mockUser: User = {
-        id: 'user-123',
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        name: email.split('@')[0],
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      toast({
-        title: "Login Successful",
-        description: "You have been logged in successfully.",
+        password
       });
       
-      navigate('/dashboard');
-    } catch (error) {
+      if (error) throw error;
+      
+      if (data.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (!userError && userData) {
+          setUser({
+            id: data.user.id,
+            email: data.user.email || '',
+            name: userData.full_name || data.user.email?.split('@')[0] || '',
+            role: userData.role
+          });
+        }
+        
+        toast({
+          title: "Login Successful",
+          description: "You have been logged in successfully.",
+        });
+        
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
       console.error('Login error:', error);
       toast({
         title: "Login Failed",
-        description: "Please check your credentials and try again.",
+        description: error.message || "Please check your credentials and try again.",
         variant: "destructive",
       });
     } finally {
@@ -105,30 +174,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Simulate a signup API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For demo purposes, create a mock user
-      const mockUser: User = {
-        id: 'user-' + Math.random().toString(36).substring(2, 9),
+      // Create user with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
         email,
-        name,
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      toast({
-        title: "Account Created",
-        description: "Your account has been created successfully.",
+        password,
+        options: {
+          data: {
+            full_name: name
+          }
+        }
       });
       
-      navigate('/dashboard');
-    } catch (error) {
+      if (error) throw error;
+      
+      if (data.user) {
+        // Create user profile in users table
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: data.user.id,
+              email: data.user.email,
+              full_name: name,
+              role: 'customer'  // Default role
+            }
+          ]);
+          
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          // Continue anyway, since the auth record was created
+        }
+        
+        setUser({
+          id: data.user.id,
+          email: data.user.email || '',
+          name: name,
+          role: 'customer'
+        });
+        
+        toast({
+          title: "Account Created",
+          description: "Your account has been created successfully.",
+        });
+        
+        navigate('/dashboard');
+      }
+    } catch (error: any) {
       console.error('Signup error:', error);
       toast({
         title: "Signup Failed",
-        description: "There was an issue creating your account.",
+        description: error.message || "There was an issue creating your account.",
         variant: "destructive",
       });
     } finally {
@@ -136,14 +231,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    toast({
-      title: "Logged Out",
-      description: "You have been logged out successfully.",
-    });
-    navigate('/');
+  const logout = async () => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setUser(null);
+      
+      toast({
+        title: "Logged Out",
+        description: "You have been logged out successfully.",
+      });
+      
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast({
+        title: "Logout Failed",
+        description: "There was an issue logging you out.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

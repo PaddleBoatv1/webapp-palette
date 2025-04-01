@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
@@ -10,41 +11,36 @@ const AuthCallback: React.FC = () => {
     const handleCallback = async () => {
       try {
         // Get the authorization code from the URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryParams = new URLSearchParams(window.location.search);
         
-        if (!code) {
-          throw new Error('Authorization code not found');
+        // Check if there's an access_token (successful login)
+        if (hashParams.has('access_token')) {
+          toast({
+            title: "Authentication Successful",
+            description: "You have been logged in successfully."
+          });
+          navigate('/dashboard');
+          return;
         }
         
-        // In a real implementation, you would send this code to your backend
-        // to exchange it for tokens and user information
-        console.log('Received authorization code:', code);
+        // Check if there's an error
+        const error = queryParams.get('error') || hashParams.get('error');
+        if (error) {
+          console.error('OAuth error:', error);
+          const errorDescription = queryParams.get('error_description') || hashParams.get('error_description');
+          throw new Error(errorDescription || 'Authentication failed');
+        }
         
-        // For demo purposes, simulate a successful authentication
-        // with a mock user
-        const mockUser = {
-          id: 'google-user-' + Math.random().toString(36).substring(2, 9),
-          email: 'user@example.com',
-          name: 'Google User',
-          photoUrl: 'https://via.placeholder.com/150',
-        };
-        
-        // Store user in localStorage
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        
-        toast({
-          title: "Google Login Successful",
-          description: "You have been logged in with Google successfully.",
-        });
-        
-        // Redirect to dashboard
+        // If we got here without a token or error, likely still in progress
+        // Supabase handles the session automatically
+        // We can just redirect to dashboard and the AuthContext will check the session
         navigate('/dashboard');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error processing OAuth callback:', error);
         toast({
           title: "Authentication Failed",
-          description: "There was an issue authenticating with Google.",
+          description: error.message || "There was an issue authenticating.",
           variant: "destructive",
         });
         navigate('/login');
