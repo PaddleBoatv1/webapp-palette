@@ -35,7 +35,7 @@ const AccessTokenRedirect = () => {
       } catch (error) {
         console.error("Error handling OAuth redirect:", error);
         // If there's an error with session storage, try direct navigation
-        navigate(`/auth/callback${location.hash}`, { replace: true });
+        window.location.href = `/auth/callback${location.hash}`;
       }
     }
   }, [location.hash, navigate]);

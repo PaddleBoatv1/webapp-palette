@@ -92,7 +92,7 @@ const AuthCallback: React.FC = () => {
             console.log("Redirecting to dashboard now");
             window._redirectTimeout = setTimeout(() => {
               navigate('/dashboard', { replace: true });
-            }, 500);
+            }, 100);
             
             return;
           } else {
@@ -123,7 +123,7 @@ const AuthCallback: React.FC = () => {
           console.log("Redirecting to dashboard now with existing session");
           window._redirectTimeout = setTimeout(() => {
             navigate('/dashboard', { replace: true });
-          }, 500);
+          }, 100);
           
           return;
         }
@@ -146,8 +146,8 @@ const AuthCallback: React.FC = () => {
         
         // Navigate to login on error
         setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 2000);
+          window.location.href = '/login';  // Use window.location to force a full page reload
+        }, 1000);
       } finally {
         setProcessing(false);
       }
@@ -216,7 +216,7 @@ const AuthCallback: React.FC = () => {
     // Add a small delay before processing to ensure context is properly initialized
     const timer = setTimeout(() => {
       handleCallback();
-    }, 500);
+    }, 100);
     
     return () => clearTimeout(timer);
   }, [navigate, location.hash, searchParams]);
@@ -244,7 +244,15 @@ const AuthCallback: React.FC = () => {
         </div>
       </div>
       <div className="mt-4 text-sm text-gray-500">
-        If you're not redirected automatically, <button onClick={() => navigate('/dashboard')} className="text-blue-500 hover:underline">click here</button>
+        If you're not redirected automatically, <button 
+          onClick={() => {
+            sessionStorage.removeItem('auth_hash');
+            window.location.href = '/login';
+          }} 
+          className="text-blue-500 hover:underline"
+        >
+          click here to return to login
+        </button>
       </div>
     </div>
   );

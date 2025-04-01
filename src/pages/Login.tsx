@@ -78,12 +78,14 @@ const Login = () => {
   const handleClearSession = async () => {
     setClearingSession(true);
     try {
+      console.log("Clearing session...");
+      
       // First try to sign out
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'global' });
       
       // Clear local storage and session storage
-      localStorage.removeItem('supabase.auth.token');
-      sessionStorage.removeItem('auth_hash');
+      localStorage.clear();
+      sessionStorage.clear();
       
       // Clear any stored cookies related to auth
       document.cookie.split(";").forEach((c) => {
@@ -94,11 +96,13 @@ const Login = () => {
       
       toast({
         title: "Session Cleared",
-        description: "Your session has been cleared. You can now try logging in again.",
+        description: "Your session has been cleared. The page will reload.",
       });
       
       // Force a page reload to clear any in-memory state
-      window.location.reload();
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1000);
     } catch (error) {
       console.error("Error clearing session:", error);
       toast({
@@ -106,6 +110,11 @@ const Login = () => {
         description: "There was a problem clearing your session. Try clearing your browser cache.",
         variant: "destructive",
       });
+      
+      // Even if there's an error, still try to reload the page
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1500);
     } finally {
       setClearingSession(false);
     }
@@ -227,17 +236,17 @@ const Login = () => {
           
           <div className="mt-4">
             <Button 
-              variant="outline" 
+              variant="destructive" 
               size="sm" 
               className="w-full" 
               onClick={handleClearSession}
-              disabled={showLoading || clearingSession}
+              disabled={clearingSession}
             >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {clearingSession ? "Clearing..." : "Clear Cached Session"}
+              <RefreshCw className={`mr-2 h-4 w-4 ${clearingSession ? 'animate-spin' : ''}`} />
+              {clearingSession ? "Clearing..." : "Force Clear Session"}
             </Button>
             <p className="text-xs text-gray-500 mt-1 text-center">
-              Use this if you're stuck in a loading state
+              Use this if you're stuck in an authentication loop
             </p>
           </div>
           
