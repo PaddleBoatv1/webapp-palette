@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -11,9 +11,6 @@ import { useForm } from "react-hook-form";
 import { User, LogIn, AlertCircle, Info, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from '@/lib/supabase';
-import { toast } from '@/hooks/use-toast';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -23,26 +20,10 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const { login, loginWithGoogle, isLoading, isAuthenticated } = useAuth();
+  const { login, loginWithGoogle, isLoading, clearAllAuthData } = useAuth();
   const [oauthError, setOauthError] = useState<string | null>(null);
-  const [localLoading, setLocalLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
   const [clearingSession, setClearingSession] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPageLoading(false);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // If already authenticated and page is loaded, redirect to dashboard
-  if (isAuthenticated && !pageLoading) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
+  
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -52,99 +33,37 @@ const Login = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    setLocalLoading(true);
     try {
       await login(data.email, data.password);
     } catch (error) {
-      // Error handling is done in the login function
-    } finally {
-      setLocalLoading(false);
+      // Error is handled in the login function
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
       setOauthError(null);
-      setLocalLoading(true);
-      console.log("Initiating Google login flow");
       await loginWithGoogle();
     } catch (error: any) {
       setOauthError(error.message || "Failed to login with Google");
-      console.error("Google login error:", error);
-      setLocalLoading(false);
     }
   };
 
   const handleClearSession = async () => {
     setClearingSession(true);
     try {
-      console.log("Clearing session...");
+      await clearAllAuthData();
       
-      // First try to sign out
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Clear local storage and session storage
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      // Clear any stored cookies related to auth
-      document.cookie.split(";").forEach((c) => {
-        document.cookie = c
-          .replace(/^ +/, "")
-          .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-      });
-      
-      toast({
-        title: "Session Cleared",
-        description: "Your session has been cleared. The page will reload.",
-      });
-      
-      // Force a page reload to clear any in-memory state
+      // Force page reload after clearing
       setTimeout(() => {
         window.location.href = '/login';
       }, 1000);
     } catch (error) {
-      console.error("Error clearing session:", error);
-      toast({
-        title: "Error",
-        description: "There was a problem clearing your session. Try clearing your browser cache.",
-        variant: "destructive",
-      });
-      
-      // Even if there's an error, still try to reload the page
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1500);
+      console.error("Error during force clear:", error);
     } finally {
       setClearingSession(false);
     }
   };
-
-  const showLoading = localLoading || isLoading;
-
-  if (pageLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <Skeleton className="h-8 w-3/4 mx-auto mb-2" />
-            <Skeleton className="h-4 w-1/2 mx-auto" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-            </div>
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -168,10 +87,10 @@ const Login = () => {
             type="button"
             className="w-full"
             onClick={handleGoogleLogin}
-            disabled={showLoading || clearingSession}
+            disabled={isLoading || clearingSession}
           >
             <User className="mr-2 h-4 w-4" />
-            {showLoading ? "Please wait..." : "Continue with Google"}
+            {isLoading ? "Please wait..." : "Continue with Google"}
           </Button>
           
           <div className="relative">
@@ -215,8 +134,8 @@ const Login = () => {
                 )}
               />
               
-              <Button type="submit" className="w-full" disabled={showLoading || clearingSession}>
-                {showLoading ? (
+              <Button type="submit" className="w-full" disabled={isLoading || clearingSession}>
+                {isLoading ? (
                   <div className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -243,7 +162,7 @@ const Login = () => {
               disabled={clearingSession}
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${clearingSession ? 'animate-spin' : ''}`} />
-              {clearingSession ? "Clearing..." : "Force Clear Session"}
+              {clearingSession ? "Clearing..." : "Reset Authentication State"}
             </Button>
             <p className="text-xs text-gray-500 mt-1 text-center">
               Use this if you're stuck in an authentication loop
@@ -255,21 +174,13 @@ const Login = () => {
             <AlertDescription className="text-sm text-gray-700">
               <p className="font-semibold mb-1">Google Sign-In Setup Checklist:</p>
               <ol className="list-decimal list-inside space-y-1 pl-1">
-                <li>Enable Google provider in Supabase Authentication → Providers</li>
-                <li>Add your Google OAuth credentials (Client ID & Secret)</li>
-                <li>Add these callback URLs to your Google OAuth Authorized redirect URIs:
-                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs break-all">
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">https://preview--webapp-palette.lovable.app/auth/callback</code></li>
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">{window.location.origin}/auth/callback</code></li>
+                <li>Set these URLs in Supabase Authentication → URL Configuration:
+                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs">
+                    <li>Site URL: <code className="bg-blue-100 px-1 py-0.5 rounded">{window.location.origin}</code></li>
+                    <li>Redirect URLs: <code className="bg-blue-100 px-1 py-0.5 rounded">{window.location.origin}/auth/callback</code></li>
                   </ul>
                 </li>
-                <li>Make sure the Origin URIs include:
-                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs break-all">
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">https://preview--webapp-palette.lovable.app</code></li>
-                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">{window.location.origin}</code></li>
-                  </ul>
-                </li>
+                <li>Add the same redirect URL to your Google OAuth settings</li>
               </ol>
             </AlertDescription>
           </Alert>

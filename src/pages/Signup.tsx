@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 const Signup = () => {
   const { signup, loginWithGoogle, isLoading } = useAuth();
-  const [oauthError, setOauthError] = React.useState<string | null>(null);
+  const [oauthError, setOauthError] = useState<string | null>(null);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -177,11 +177,10 @@ const Signup = () => {
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-sm text-gray-700">
-              <p className="font-semibold mb-1">Google Sign-In Setup Guide:</p>
+              <p className="mb-1">For testing purposes:</p>
               <ol className="list-decimal list-inside space-y-1 pl-1">
-                <li>Enable Google provider in Supabase Authentication → Providers</li>
-                <li>Add your Google OAuth credentials (Client ID & Secret)</li>
-                <li>Add this callback URL to your Google OAuth settings: <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
+                <li>Consider disabling email confirmation in Supabase Authentication settings</li>
+                <li>Ensure the Site URL and Redirect URLs are correctly configured</li>
               </ol>
             </AlertDescription>
           </Alert>

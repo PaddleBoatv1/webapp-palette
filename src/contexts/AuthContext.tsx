@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  clearAllAuthData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,139 +30,171 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Function to clear all auth data (useful for resetting state)
+  const clearAllAuthData = async (): Promise<void> => {
+    try {
+      // Sign out from Supabase with global scope to clear all sessions
+      await supabase.auth.signOut({ scope: 'global' });
+      
+      // Clear any stored data
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+      });
+      
+      // Clear in-memory state
+      setUser(null);
+      
+      toast({
+        title: "Auth Data Cleared",
+        description: "All authentication data has been cleared",
+      });
+    } catch (error) {
+      console.error("Error clearing auth data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to clear authentication data",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
-    const fetchSession = async () => {
+    const initialize = async () => {
       try {
-        console.log("Checking for existing session...");
+        setIsLoading(true);
         
-        const { data: { session } } = await supabase.auth.getSession();
+        // Set up auth state change listener first
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            console.log(`Auth state changed: ${event}`, session?.user?.id || 'No user');
+            
+            if (session?.user) {
+              // Only use setTimeout for async operations to prevent potential auth deadlocks
+              setTimeout(async () => {
+                try {
+                  const { data: userData, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+                
+                  if (error && error.code !== 'PGRST116') {
+                    console.error("Error fetching user data:", error);
+                    return;
+                  }
+                  
+                  if (!userData) {
+                    console.log("Creating new user profile");
+                    const { error: insertError } = await supabase
+                      .from('users')
+                      .insert([{
+                        id: session.user.id,
+                        email: session.user.email,
+                        full_name: session.user.user_metadata?.full_name || 
+                                session.user.user_metadata?.name || 
+                                session.user.email?.split('@')[0] || '',
+                        role: 'customer'
+                      }]);
+                    
+                    if (insertError) {
+                      console.error("Error creating user profile:", insertError);
+                    }
+                  }
+                  
+                  // Update the user state with the session data
+                  setUser({
+                    id: session.user.id,
+                    email: session.user.email || '',
+                    name: userData?.full_name || 
+                         session.user.user_metadata?.full_name || 
+                         session.user.user_metadata?.name || 
+                         session.user.email?.split('@')[0] || '',
+                    photoUrl: session.user.user_metadata?.avatar_url,
+                    role: userData?.role || 'customer'
+                  });
+                } catch (err) {
+                  console.error("Error processing auth state change:", err);
+                }
+              }, 0);
+            } else if (event === 'SIGNED_OUT') {
+              setUser(null);
+            }
+          }
+        );
         
-        if (session) {
-          console.log("Found existing session for user:", session.user.id);
-          const { data: userData, error } = await supabase
+        // Then check for existing session
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error getting session:", error);
+          throw error;
+        }
+        
+        if (data.session?.user) {
+          console.log("Found existing session for user:", data.session.user.id);
+          
+          // Fetch user profile if session exists
+          const { data: userData, error: userError } = await supabase
             .from('users')
             .select('*')
-            .eq('id', session.user.id)
+            .eq('id', data.session.user.id)
             .single();
-            
-          if (error) {
-            console.error("Error fetching user data:", error);
-            throw error;
+          
+          if (userError && userError.code !== 'PGRST116') {
+            console.error("Error fetching user data:", userError);
           }
           
           setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            name: userData?.full_name || session.user.email?.split('@')[0] || '',
-            photoUrl: session.user.user_metadata?.avatar_url,
-            role: userData?.role
+            id: data.session.user.id,
+            email: data.session.user.email || '',
+            name: userData?.full_name || 
+                 data.session.user.user_metadata?.full_name || 
+                 data.session.user.user_metadata?.name || 
+                 data.session.user.email?.split('@')[0] || '',
+            photoUrl: data.session.user.user_metadata?.avatar_url,
+            role: userData?.role || 'customer'
           });
-          console.log("User set from existing session");
         } else {
           console.log("No existing session found");
         }
       } catch (error) {
-        console.error('Error checking session:', error);
+        console.error("Error initializing auth:", error);
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchSession();
+    initialize();
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session ? session.user.id : 'No user');
-      
-      if (event === 'SIGNED_IN' && session) {
-        try {
-          setIsLoading(true);
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (!error && userData) {
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              name: userData?.full_name || session.user.email?.split('@')[0] || '',
-              photoUrl: session.user.user_metadata?.avatar_url,
-              role: userData?.role
-            });
-            console.log("User data fetched successfully after sign in");
-          } else if (error) {
-            console.log("User not found in users table, creating one", error);
-            if (error.code === 'PGRST116') {
-              const { error: insertError } = await supabase
-                .from('users')
-                .insert([
-                  {
-                    id: session.user.id,
-                    email: session.user.email,
-                    full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
-                    role: 'customer'
-                  }
-                ]);
-              
-              if (!insertError) {
-                console.log("Created new user record in users table");
-                setUser({
-                  id: session.user.id,
-                  email: session.user.email || '',
-                  name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
-                  photoUrl: session.user.user_metadata?.avatar_url,
-                  role: 'customer'
-                });
-              } else {
-                console.error("Error creating user record:", insertError);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        console.log("User signed out");
-        setUser(null);
-      }
-    });
-    
+    // Return cleanup function
     return () => {
-      subscription.unsubscribe();
+      // Subscriptions are cleaned up automatically when component unmounts
     };
   }, []);
 
   const loginWithGoogle = async () => {
     try {
       setIsLoading(true);
-      console.log("Starting Google login flow");
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
         }
       });
       
-      if (error) {
-        console.error("Google sign-in error:", error);
-        throw error;
-      }
-      
-      console.log("Google sign-in initiated, waiting for redirect");
-      setIsLoading(false);
+      if (error) throw error;
     } catch (error: any) {
       console.error('Google login error:', error);
       toast({
         title: "Login Failed",
-        description: error.message || "There was an issue logging in with Google.",
+        description: error.message || "There was an issue logging in with Google",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -170,41 +204,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      console.log("Attempting email/password login");
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
-      if (error) {
-        console.error("Login error:", error);
-        throw error;
-      }
+      if (error) throw error;
       
       if (data.user) {
-        console.log("Login successful for user:", data.user.id);
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-          
-        if (!userError && userData) {
-          setUser({
-            id: data.user.id,
-            email: data.user.email || '',
-            name: userData.full_name || data.user.email?.split('@')[0] || '',
-            role: userData.role
-          });
-          console.log("User data fetched successfully");
-        } else {
-          console.log("User data not found, using basic data");
-        }
-        
         toast({
           title: "Login Successful",
-          description: "You have been logged in successfully.",
+          description: "You have been logged in successfully",
         });
         
         navigate('/dashboard');
@@ -213,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Login error:', error);
       toast({
         title: "Login Failed",
-        description: error.message || "Please check your credentials and try again.",
+        description: error.message || "Please check your credentials and try again",
         variant: "destructive",
       });
       throw error;
@@ -238,41 +249,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: data.user.id,
-              email: data.user.email,
-              full_name: name,
-              role: 'customer'
-            }
-          ]);
-          
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-        }
-        
-        setUser({
-          id: data.user.id,
-          email: data.user.email || '',
-          name: name,
-          role: 'customer'
-        });
-        
-        toast({
-          title: "Account Created",
-          description: "Your account has been created successfully.",
-        });
-        
-        navigate('/dashboard');
-      }
+      toast({
+        title: "Signup Successful",
+        description: "Your account has been created successfully",
+      });
+      
+      // No need to manually set user state or create profile -
+      // the onAuthStateChange handler will do this automatically
+      
+      navigate('/dashboard');
     } catch (error: any) {
       console.error('Signup error:', error);
       toast({
         title: "Signup Failed",
-        description: error.message || "There was an issue creating your account.",
+        description: error.message || "There was an issue creating your account",
         variant: "destructive",
       });
     } finally {
@@ -283,6 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       setIsLoading(true);
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
@@ -290,15 +281,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       toast({
         title: "Logged Out",
-        description: "You have been logged out successfully.",
+        description: "You have been logged out successfully",
       });
       
       navigate('/');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
       toast({
         title: "Logout Failed",
-        description: "There was an issue logging you out.",
+        description: error.message || "There was an issue logging you out",
         variant: "destructive",
       });
     } finally {
@@ -314,7 +305,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, 
       loginWithGoogle, 
       signup, 
-      logout 
+      logout,
+      clearAllAuthData
     }}>
       {children}
     </AuthContext.Provider>
