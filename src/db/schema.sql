@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.boat_deliveries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reservation_id UUID REFERENCES public.reservations(id) ON DELETE CASCADE,
   liaison_id UUID REFERENCES public.company_liaisons(id) ON DELETE SET NULL,
-  delivery_status TEXT DEFAULT 'assigned' CHECK (status IN ('assigned', 'in_transit', 'delivered', 'completed')),
+  delivery_status TEXT DEFAULT 'assigned' CHECK (delivery_status IN ('assigned', 'in_transit', 'delivered', 'completed')),
   estimated_arrival TIMESTAMPTZ,
   actual_arrival TIMESTAMPTZ,
   pickup_time TIMESTAMPTZ,
@@ -159,7 +159,31 @@ USING (auth.uid() IN (
   SELECT user_id FROM public.reservations WHERE id = reservation_id
 ));
 
--- Admin role permissions (example)
+-- Waiver Acceptances Policies
+CREATE POLICY "Users can view their own waiver acceptances"
+ON public.waiver_acceptances FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own waiver acceptances"
+ON public.waiver_acceptances FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+-- Waivers are public
+CREATE POLICY "Anyone can view waivers"
+ON public.waivers FOR SELECT
+USING (true);
+
+-- Zones are public
+CREATE POLICY "Anyone can view zones"
+ON public.zones FOR SELECT
+USING (true);
+
+-- Boats are public for viewing
+CREATE POLICY "Anyone can view boats"
+ON public.boats FOR SELECT
+USING (true);
+
+-- Admin role permissions
 CREATE POLICY "Admins have full access to users" 
 ON public.users 
 USING (
@@ -172,7 +196,63 @@ USING (
   auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
 );
 
+CREATE POLICY "Admins have full access to boats" 
+ON public.boats 
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
+);
+
+CREATE POLICY "Admins have full access to zones" 
+ON public.zones 
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
+);
+
+CREATE POLICY "Admins have full access to payments" 
+ON public.payments 
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
+);
+
+CREATE POLICY "Admins have full access to boat_deliveries" 
+ON public.boat_deliveries 
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
+);
+
+CREATE POLICY "Admins have full access to company_liaisons" 
+ON public.company_liaisons 
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
+);
+
+-- Liaison role permissions
+CREATE POLICY "Liaisons can view reservations" 
+ON public.reservations 
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'liaison')
+);
+
+CREATE POLICY "Liaisons can update specific reservations" 
+ON public.reservations FOR UPDATE
+USING (
+  auth.uid() IN (SELECT id FROM public.users WHERE role = 'liaison') AND
+  status IN ('confirmed', 'in_progress')
+);
+
+CREATE POLICY "Liaisons can view and update boat_deliveries" 
+ON public.boat_deliveries 
+USING (
+  auth.uid() IN (SELECT user_id FROM public.company_liaisons WHERE id IN 
+    (SELECT liaison_id FROM public.boat_deliveries WHERE id = public.boat_deliveries.id)
+  )
+);
+
 -- Add indexes for performance
 CREATE INDEX IF NOT EXISTS idx_reservations_user_id ON public.reservations(user_id);
 CREATE INDEX IF NOT EXISTS idx_payments_reservation_id ON public.payments(reservation_id);
 CREATE INDEX IF NOT EXISTS idx_boat_locations_boat_id ON public.boat_locations(boat_id);
+CREATE INDEX IF NOT EXISTS idx_company_liaisons_user_id ON public.company_liaisons(user_id);
+CREATE INDEX IF NOT EXISTS idx_boat_deliveries_reservation_id ON public.boat_deliveries(reservation_id);
+CREATE INDEX IF NOT EXISTS idx_boat_deliveries_liaison_id ON public.boat_deliveries(liaison_id);
+CREATE INDEX IF NOT EXISTS idx_waiver_acceptances_user_id ON public.waiver_acceptances(user_id);

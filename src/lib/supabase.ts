@@ -89,3 +89,40 @@ export type WaiverAcceptance = {
   accepted_at: string;
   signature_file_url?: string;
 };
+
+export type CompanyLiaison = {
+  id: string;
+  user_id: string;
+  is_active: boolean;
+  current_location?: {
+    lat: number;
+    lng: number;
+  };
+};
+
+export type BoatDelivery = {
+  id: string;
+  reservation_id: string;
+  liaison_id?: string;
+  delivery_status: 'assigned' | 'in_transit' | 'delivered' | 'completed';
+  estimated_arrival?: string;
+  actual_arrival?: string;
+  pickup_time?: string;
+};
+
+export type BoatLocation = {
+  id: string;
+  boat_id: string;
+  captured_at: string;
+  lat: number;
+  lng: number;
+};
+
+export type Notification = {
+  id: string;
+  user_id: string;
+  notification_type: string;
+  channel: 'email' | 'sms' | 'push';
+  message_content: string;
+  sent_at?: string;
+};
