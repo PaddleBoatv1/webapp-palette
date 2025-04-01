@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { User, LogIn, AlertCircle, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -20,15 +21,25 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
-  const { login, loginWithGoogle, isLoading } = useAuth();
+  const { login, loginWithGoogle, isLoading, isAuthenticated } = useAuth();
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [localLoading, setLocalLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
-  // Reset loading state when component mounts
+  // Check if user is already authenticated
   useEffect(() => {
-    // This will ensure the page isn't stuck in a loading state when it first loads
-    setLocalLoading(false);
+    // Set a timeout to avoid flickering when checking auth state
+    const timer = setTimeout(() => {
+      setPageLoading(false);
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, []);
+
+  // If authenticated, redirect to dashboard
+  if (isAuthenticated && !pageLoading) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -64,6 +75,31 @@ const Login = () => {
 
   // Determine if we should show loading state
   const showLoading = localLoading || isLoading;
+
+  // Show loading skeleton while checking auth state
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="space-y-1">
+            <Skeleton className="h-8 w-3/4 mx-auto mb-2" />
+            <Skeleton className="h-4 w-1/2 mx-auto" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+            </div>
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -164,9 +200,15 @@ const Login = () => {
                   <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs break-all">
                     <li><code className="bg-blue-100 px-1 py-0.5 rounded">https://vstqtcvwnvkcdrxteubg.supabase.co/auth/v1/callback</code></li>
                     <li><code className="bg-blue-100 px-1 py-0.5 rounded">http://localhost:3000/auth/callback</code></li>
+                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">{window.location.origin}/auth/callback</code></li>
                   </ul>
                 </li>
-                <li>Make sure the Origin URIs include <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">http://localhost:3000</code></li>
+                <li>Make sure the Origin URIs include:
+                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-xs break-all">
+                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">http://localhost:3000</code></li>
+                    <li><code className="bg-blue-100 px-1 py-0.5 rounded">{window.location.origin}</code></li>
+                  </ul>
+                </li>
               </ol>
             </AlertDescription>
           </Alert>
