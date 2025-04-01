@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -7,10 +8,12 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { User, LogIn, AlertCircle, Info } from "lucide-react";
+import { User, LogIn, AlertCircle, Info, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from '@/lib/supabase';
+import { toast } from '@/hooks/use-toast';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -24,6 +27,8 @@ const Login = () => {
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [localLoading, setLocalLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [clearingSession, setClearingSession] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -33,6 +38,7 @@ const Login = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // If already authenticated and page is loaded, redirect to dashboard
   if (isAuthenticated && !pageLoading) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -50,6 +56,7 @@ const Login = () => {
     try {
       await login(data.email, data.password);
     } catch (error) {
+      // Error handling is done in the login function
     } finally {
       setLocalLoading(false);
     }
@@ -65,6 +72,42 @@ const Login = () => {
       setOauthError(error.message || "Failed to login with Google");
       console.error("Google login error:", error);
       setLocalLoading(false);
+    }
+  };
+
+  const handleClearSession = async () => {
+    setClearingSession(true);
+    try {
+      // First try to sign out
+      await supabase.auth.signOut();
+      
+      // Clear local storage and session storage
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.removeItem('auth_hash');
+      
+      // Clear any stored cookies related to auth
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+      });
+      
+      toast({
+        title: "Session Cleared",
+        description: "Your session has been cleared. You can now try logging in again.",
+      });
+      
+      // Force a page reload to clear any in-memory state
+      window.location.reload();
+    } catch (error) {
+      console.error("Error clearing session:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem clearing your session. Try clearing your browser cache.",
+        variant: "destructive",
+      });
+    } finally {
+      setClearingSession(false);
     }
   };
 
@@ -116,7 +159,7 @@ const Login = () => {
             type="button"
             className="w-full"
             onClick={handleGoogleLogin}
-            disabled={showLoading}
+            disabled={showLoading || clearingSession}
           >
             <User className="mr-2 h-4 w-4" />
             {showLoading ? "Please wait..." : "Continue with Google"}
@@ -163,7 +206,7 @@ const Login = () => {
                 )}
               />
               
-              <Button type="submit" className="w-full" disabled={showLoading}>
+              <Button type="submit" className="w-full" disabled={showLoading || clearingSession}>
                 {showLoading ? (
                   <div className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -181,6 +224,22 @@ const Login = () => {
               </Button>
             </form>
           </Form>
+          
+          <div className="mt-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full" 
+              onClick={handleClearSession}
+              disabled={showLoading || clearingSession}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {clearingSession ? "Clearing..." : "Clear Cached Session"}
+            </Button>
+            <p className="text-xs text-gray-500 mt-1 text-center">
+              Use this if you're stuck in a loading state
+            </p>
+          </div>
           
           <Alert variant="default" className="bg-blue-50 border-blue-200">
             <Info className="h-4 w-4 text-blue-500" />

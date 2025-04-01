@@ -1,16 +1,36 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(true);
 
   useEffect(() => {
+    // Check for error in URL search params
+    const errorParam = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+    
+    if (errorParam) {
+      console.error("Auth error from URL:", errorParam, errorDescription);
+      setError(errorDescription || `Authentication error: ${errorParam}`);
+      toast({
+        title: "Authentication Failed",
+        description: errorDescription || `Authentication error: ${errorParam}`,
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 2000);
+      setProcessing(false);
+      return;
+    }
+
     const handleCallback = async () => {
       try {
         console.log("Auth callback triggered. Processing auth response...");
@@ -199,7 +219,7 @@ const AuthCallback: React.FC = () => {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [navigate, location.hash]);
+  }, [navigate, location.hash, searchParams]);
 
   // Add more visible loading and error states
   return (
