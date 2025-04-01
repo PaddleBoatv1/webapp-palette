@@ -52,11 +52,10 @@ export const executeSchema = async () => {
  */
 export const isSchemaSetup = async () => {
   try {
-    // Query the information_schema to check if our tables exist
+    // Try to query the boats table which should exist if schema is set up
     const { data, error } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
+      .from('boats')
+      .select('id')
       .limit(1);
     
     if (error) {
@@ -64,8 +63,8 @@ export const isSchemaSetup = async () => {
       return false;
     }
     
-    // Return true if we have at least one table in the public schema
-    return data && data.length > 0;
+    // If we can query the boats table, schema is set up
+    return true;
   } catch (error) {
     console.error('Exception checking schema setup:', error);
     return false;

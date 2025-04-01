@@ -139,6 +139,21 @@ CREATE POLICY "Users can update their own profile"
 ON public.users FOR UPDATE 
 USING (auth.uid() = id);
 
+-- First allow admins to create users (otherwise we can't create the first admin)
+CREATE POLICY "Allow public signup"
+ON public.users FOR INSERT
+WITH CHECK (true);
+
+-- Admin role permissions - Fixed to avoid recursion
+-- This policy allows admins to do anything with users (view, update, delete)
+CREATE POLICY "Admins have full access to users" 
+ON public.users 
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
+
 -- Reservations Table Policies
 CREATE POLICY "Users can view their own reservations" 
 ON public.reservations FOR SELECT 
@@ -183,68 +198,81 @@ CREATE POLICY "Anyone can view boats"
 ON public.boats FOR SELECT
 USING (true);
 
--- Admin role permissions
-CREATE POLICY "Admins have full access to users" 
-ON public.users 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
-
+-- Admin policies for other tables (fixed to avoid recursion)
 CREATE POLICY "Admins have full access to reservations" 
 ON public.reservations 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
 
 CREATE POLICY "Admins have full access to boats" 
 ON public.boats 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
 
 CREATE POLICY "Admins have full access to zones" 
 ON public.zones 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
 
 CREATE POLICY "Admins have full access to payments" 
 ON public.payments 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
 
 CREATE POLICY "Admins have full access to boat_deliveries" 
 ON public.boat_deliveries 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
 
 CREATE POLICY "Admins have full access to company_liaisons" 
 ON public.company_liaisons 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'admin')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'admin'
+));
 
 -- Liaison role permissions
 CREATE POLICY "Liaisons can view reservations" 
 ON public.reservations 
-USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'liaison')
-);
+USING (EXISTS (
+  SELECT 1 FROM auth.users
+  WHERE auth.users.id = auth.uid() 
+  AND auth.users.raw_app_meta_data->>'role' = 'liaison'
+));
 
 CREATE POLICY "Liaisons can update specific reservations" 
 ON public.reservations FOR UPDATE
 USING (
-  auth.uid() IN (SELECT id FROM public.users WHERE role = 'liaison') AND
-  status IN ('confirmed', 'in_progress')
+  EXISTS (
+    SELECT 1 FROM auth.users
+    WHERE auth.users.id = auth.uid() 
+    AND auth.users.raw_app_meta_data->>'role' = 'liaison'
+  ) AND status IN ('confirmed', 'in_progress')
 );
 
 CREATE POLICY "Liaisons can view and update boat_deliveries" 
 ON public.boat_deliveries 
 USING (
-  auth.uid() IN (SELECT user_id FROM public.company_liaisons WHERE id IN 
-    (SELECT liaison_id FROM public.boat_deliveries WHERE id = public.boat_deliveries.id)
+  EXISTS (
+    SELECT 1 FROM auth.users
+    WHERE auth.users.id = auth.uid() 
+    AND auth.users.raw_app_meta_data->>'role' = 'liaison'
   )
 );
 

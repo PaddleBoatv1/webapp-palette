@@ -112,12 +112,22 @@ const DatabaseSetup: React.FC = () => {
           title: "Admin Created",
           description: `Admin user ${adminEmail} has been created successfully.`,
         });
+        setError(null);
       } else {
         throw new Error('Failed to create admin user');
       }
     } catch (err: any) {
       console.error('Error creating admin:', err);
-      const errorMessage = err.message || 'Failed to create admin user. Check console for details.';
+      let errorMessage = 'Failed to create admin user. Check console for details.';
+      
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.error_description) {
+        errorMessage = err.error_description;
+      } else if (typeof err === 'object') {
+        errorMessage = JSON.stringify(err);
+      }
+      
       setError(errorMessage);
       toast({
         title: "Admin Creation Failed",
@@ -213,7 +223,7 @@ $function$;`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {success && (
+          {success && !error && (
             <Alert>
               <AlertTitle>Success!</AlertTitle>
               <AlertDescription>
@@ -263,7 +273,7 @@ $function$;`}
             
             <Button 
               onClick={handleCreateAdmin} 
-              disabled={loading || !adminEmail || !adminPassword || !adminName}
+              disabled={loading || !adminEmail || !adminPassword || !adminName || !schemaExists || password.length < 6}
               className="w-full"
             >
               {loading ? 'Creating...' : 'Create Admin User'}

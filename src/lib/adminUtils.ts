@@ -238,40 +238,6 @@ export const seedBoats = async () => {
 // Create an admin user (for testing)
 export const createAdminUser = async (email: string, password: string, fullName: string) => {
   try {
-    console.log('Creating users table if it doesn\'t exist...');
-    
-    // Check if the table exists and create it if needed
-    const { data: tableExists, error: checkError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'users')
-      .single();
-    
-    if (checkError && !tableExists) {
-      console.log('Creating users table...');
-      const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS public.users (
-          id UUID PRIMARY KEY,
-          email TEXT UNIQUE NOT NULL,
-          full_name TEXT,
-          phone_number TEXT,
-          role TEXT DEFAULT 'customer' CHECK (role IN ('customer', 'admin', 'liaison')),
-          created_at TIMESTAMPTZ DEFAULT now(),
-          updated_at TIMESTAMPTZ DEFAULT now()
-        );
-      `;
-      
-      const { error: createError } = await supabase.rpc('exec_sql', { 
-        sql_query: createTableQuery 
-      });
-      
-      if (createError) {
-        console.error('Error creating users table:', createError);
-        throw createError;
-      }
-    }
-    
     // 1. Create the auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,

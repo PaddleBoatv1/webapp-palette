@@ -12,7 +12,6 @@ import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/AuthCallback";
 import { AuthProvider } from "./contexts/AuthContext";
 import DatabaseSetup from "./components/DatabaseSetup";
-import SupabaseConnectionGuide from "./components/SupabaseConnectionGuide";
 
 const queryClient = new QueryClient();
 
