@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -12,17 +12,23 @@ import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/AuthCallback";
 import { AuthProvider } from "./contexts/AuthContext";
 import DatabaseSetup from "./components/DatabaseSetup";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 // Component to handle access token redirects
 const AccessTokenRedirect = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   
-  // If URL has access_token in hash, navigate to auth callback
-  if (location.hash && location.hash.includes('access_token')) {
-    return <Navigate to="/auth/callback" replace />;
-  }
+  useEffect(() => {
+    // Check if there's an access token in the URL hash
+    if (location.hash && location.hash.includes('access_token')) {
+      console.log("Found access_token in hash, redirecting to auth callback");
+      // Preserve the hash when redirecting
+      navigate(`/auth/callback${location.hash}`, { replace: true });
+    }
+  }, [location.hash, navigate]);
   
   return null;
 };
@@ -36,9 +42,9 @@ const App = () => {
         <BrowserRouter>
           <AuthProvider>
             <div className="bg-black p-2 text-white text-center">
-              <Link to="/db-setup" className="hover:underline">
+              <a href="/db-setup" className="hover:underline">
                 Database Setup Page →
-              </Link>
+              </a>
             </div>
             
             <Routes>
@@ -47,10 +53,9 @@ const App = () => {
               <Route path="/signup" element={<><AccessTokenRedirect /><Signup /></>} />
               <Route path="/dashboard" element={<><AccessTokenRedirect /><Dashboard /></>} />
               <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/*" element={<AccessTokenRedirect />} /> {/* Catch-all for token redirects */}
               <Route path="/db-setup" element={<DatabaseSetup />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<><AccessTokenRedirect /><NotFound /></>} />
             </Routes>
           </AuthProvider>
         </BrowserRouter>

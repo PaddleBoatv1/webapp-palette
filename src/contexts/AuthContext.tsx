@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -133,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const origin = window.location.origin;
       console.log("Current origin:", origin);
       
-      // Use auth/callback route on the current origin for the redirect
+      // Use the exact URL based on the current origin
       const redirectUrl = `${origin}/auth/callback`;
       console.log("Using redirect URL:", redirectUrl);
       

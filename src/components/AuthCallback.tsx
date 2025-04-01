@@ -13,37 +13,15 @@ const AuthCallback: React.FC = () => {
     const handleCallback = async () => {
       try {
         console.log("Auth callback triggered. Processing auth response...");
+        console.log("Current URL:", window.location.href);
+        console.log("Hash present:", !!location.hash);
         
-        // Get the hash fragment (from the current URL or original window)
-        let hash = window.location.hash;
-        let search = window.location.search;
-        
-        // Get hash from current URL or via the redirected URL
-        if (!hash && search && search.includes('code=')) {
-          console.log("OAuth code found in search params, checking for hash...");
-          // We might be in a code flow without hash
-          const params = new URLSearchParams(search);
-          if (params.has('code')) {
-            // Let Supabase exchange the code
-            console.log("Letting Supabase handle code exchange...");
-            const { data, error } = await supabase.auth.getSession();
-            
-            if (error) {
-              console.error("Error getting session from code:", error);
-              throw error;
-            }
-            
-            if (data.session) {
-              console.log("Session established from code flow:", data.session.user.id);
-              await processUser(data.session.user.id);
-              return;
-            }
-          }
-        }
+        // Get the hash fragment from the URL
+        let hash = location.hash;
         
         // If we have a hash with access_token, process it
         if (hash && hash.includes('access_token')) {
-          console.log("Found access_token in hash, processing...");
+          console.log("Processing hash with access token");
           
           // Extract token from hash (remove # at start)
           const hashParams = new URLSearchParams(hash.substring(1));
@@ -51,10 +29,11 @@ const AuthCallback: React.FC = () => {
           const refreshToken = hashParams.get('refresh_token');
           
           if (!accessToken) {
+            console.error("No access token found in URL hash");
             throw new Error("Access token not found in URL");
           }
           
-          console.log("Setting session with token from hash");
+          console.log("Access token found, setting session");
           
           // Set the session with tokens from URL
           const { data, error } = await supabase.auth.setSession({
@@ -72,12 +51,13 @@ const AuthCallback: React.FC = () => {
             await processUser(data.session.user.id);
             return;
           } else {
+            console.error("No session established after setting token");
             throw new Error("Failed to establish session with token");
           }
         }
         
         // Fallback: try to get existing session
-        console.log("No token in URL, checking for existing session");
+        console.log("No token in hash or token processing failed, checking for existing session");
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -104,7 +84,7 @@ const AuthCallback: React.FC = () => {
           variant: "destructive",
         });
         
-        // Wait a moment before redirecting on error
+        // Navigate to login on error
         setTimeout(() => {
           navigate('/login');
         }, 2000);
@@ -114,6 +94,8 @@ const AuthCallback: React.FC = () => {
     // Helper function to ensure user exists in the users table
     const processUser = async (userId: string) => {
       try {
+        console.log("Processing user:", userId);
+        
         // Check if user exists in users table
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -127,7 +109,12 @@ const AuthCallback: React.FC = () => {
           
           // Get user details from auth
           const { data: authData } = await supabase.auth.getUser();
-          if (!authData.user) throw new Error("User data not available");
+          if (!authData.user) {
+            console.error("User data not available");
+            throw new Error("User data not available");
+          }
+          
+          console.log("Auth user data:", authData.user);
           
           // Insert user into users table
           const { error: insertError } = await supabase
@@ -136,25 +123,32 @@ const AuthCallback: React.FC = () => {
               id: userId,
               email: authData.user.email,
               full_name: authData.user.user_metadata?.full_name || 
-                         authData.user.user_metadata?.name || 
-                         authData.user.email?.split('@')[0] || '',
-              role: 'customer' // Default role
+                        authData.user.user_metadata?.name || 
+                        authData.user.email?.split('@')[0] || '',
+              role: authData.user.user_metadata?.role || 'customer' // Default role
             }]);
             
           if (insertError) {
             console.error("Error creating user profile:", insertError);
             // Continue anyway as auth is successful
+          } else {
+            console.log("User profile created successfully");
           }
+        } else {
+          console.log("User already exists in users table");
         }
         
-        // Show success toast and redirect
+        // Show success toast
         toast({
           title: "Authentication Successful",
           description: "You have been logged in successfully.",
         });
         
-        // Navigate to dashboard
-        navigate('/dashboard');
+        // Navigate to dashboard after a short delay to allow the toast to show
+        console.log("Redirecting to dashboard...");
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 500);
       } catch (err) {
         console.error("Error processing user:", err);
         throw err;
@@ -162,7 +156,7 @@ const AuthCallback: React.FC = () => {
     };
     
     handleCallback();
-  }, [navigate, location]);
+  }, [navigate, location.hash]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
