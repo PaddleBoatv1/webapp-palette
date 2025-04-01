@@ -130,6 +130,149 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 -- Create Row Level Security Policies
 
+-- First drop existing policies to avoid errors
+DO $$ 
+BEGIN
+  -- Drop users policies
+  BEGIN
+    DROP POLICY IF EXISTS "Users can view their own profile" ON public.users;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Users can update their own profile" ON public.users;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Allow public signup" ON public.users;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to users" ON public.users;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  -- Drop reservations policies
+  BEGIN
+    DROP POLICY IF EXISTS "Users can view their own reservations" ON public.reservations;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Users can create their own reservations" ON public.reservations;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Users can update their own reservations" ON public.reservations;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to reservations" ON public.reservations;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  -- Drop payments policies
+  BEGIN
+    DROP POLICY IF EXISTS "Users can view their own payments" ON public.payments;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to payments" ON public.payments;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  -- Drop waiver acceptances policies
+  BEGIN
+    DROP POLICY IF EXISTS "Users can view their own waiver acceptances" ON public.waiver_acceptances;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Users can create their own waiver acceptances" ON public.waiver_acceptances;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  -- Drop waivers policies
+  BEGIN
+    DROP POLICY IF EXISTS "Anyone can view waivers" ON public.waivers;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  -- Drop zones policies
+  BEGIN
+    DROP POLICY IF EXISTS "Anyone can view zones" ON public.zones;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  -- Drop boats policies
+  BEGIN
+    DROP POLICY IF EXISTS "Anyone can view boats" ON public.boats;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to boats" ON public.boats;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to zones" ON public.zones;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to boat_deliveries" ON public.boat_deliveries;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Admins have full access to company_liaisons" ON public.company_liaisons;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Liaisons can view reservations" ON public.reservations;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Liaisons can update specific reservations" ON public.reservations;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  
+  BEGIN
+    DROP POLICY IF EXISTS "Liaisons can view and update boat_deliveries" ON public.boat_deliveries;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+END $$;
+
 -- Users Table Policies
 CREATE POLICY "Users can view their own profile" 
 ON public.users FOR SELECT 
@@ -144,13 +287,11 @@ CREATE POLICY "Allow public signup"
 ON public.users FOR INSERT
 WITH CHECK (true);
 
--- Fixed admin policy to avoid infinite recursion
--- This policy allows admins to do anything with users
-DROP POLICY IF EXISTS "Admins have full access to users" ON public.users;
+-- Admins have full access to users
 CREATE POLICY "Admins have full access to users" 
 ON public.users 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
 -- Reservations Table Policies
@@ -197,71 +338,61 @@ CREATE POLICY "Anyone can view boats"
 ON public.boats FOR SELECT
 USING (true);
 
--- Fixed admin policies for other tables to avoid recursion
--- Now using the users table directly instead of auth.users
-DROP POLICY IF EXISTS "Admins have full access to reservations" ON public.reservations;
+-- Admin policies for other tables
 CREATE POLICY "Admins have full access to reservations" 
 ON public.reservations 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
-DROP POLICY IF EXISTS "Admins have full access to boats" ON public.boats;
 CREATE POLICY "Admins have full access to boats" 
 ON public.boats 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
-DROP POLICY IF EXISTS "Admins have full access to zones" ON public.zones;
 CREATE POLICY "Admins have full access to zones" 
 ON public.zones 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
-DROP POLICY IF EXISTS "Admins have full access to payments" ON public.payments;
 CREATE POLICY "Admins have full access to payments" 
 ON public.payments 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
-DROP POLICY IF EXISTS "Admins have full access to boat_deliveries" ON public.boat_deliveries;
 CREATE POLICY "Admins have full access to boat_deliveries" 
 ON public.boat_deliveries 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
-DROP POLICY IF EXISTS "Admins have full access to company_liaisons" ON public.company_liaisons;
 CREATE POLICY "Admins have full access to company_liaisons" 
 ON public.company_liaisons 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+  auth.jwt() ->> 'role' = 'admin'
 );
 
 -- Liaison role permissions
-DROP POLICY IF EXISTS "Liaisons can view reservations" ON public.reservations;
 CREATE POLICY "Liaisons can view reservations" 
 ON public.reservations 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'liaison'
+  auth.jwt() ->> 'role' = 'liaison'
 );
 
-DROP POLICY IF EXISTS "Liaisons can update specific reservations" ON public.reservations;
 CREATE POLICY "Liaisons can update specific reservations" 
 ON public.reservations FOR UPDATE
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'liaison'
+  auth.jwt() ->> 'role' = 'liaison'
   AND status IN ('confirmed', 'in_progress')
 );
 
-DROP POLICY IF EXISTS "Liaisons can view and update boat_deliveries" ON public.boat_deliveries;
 CREATE POLICY "Liaisons can view and update boat_deliveries" 
 ON public.boat_deliveries 
 USING (
-  (SELECT role FROM public.users WHERE id = auth.uid()) = 'liaison'
+  auth.jwt() ->> 'role' = 'liaison'
 );
 
 -- Add indexes for performance

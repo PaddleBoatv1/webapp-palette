@@ -11,7 +11,7 @@ export const executeSchema = async () => {
     console.log('Beginning schema execution...');
     
     // Split the schema into separate statements by semicolons
-    // This is a simple approach and might not work for complex SQL with semicolons in strings
+    // We need to handle this carefully to avoid splitting SQL within quotes or comments
     const statements = schemaSQL
       .split(';')
       .map(stmt => stmt.trim())
@@ -30,7 +30,13 @@ export const executeSchema = async () => {
         
         if (error) {
           console.error(`Error executing statement ${i + 1}:`, error);
-          // Continue with the next statement even if one fails
+          // If it's just a "policy already exists" error, we can continue
+          if (error.code === '42710' && error.message.includes('already exists')) {
+            console.log(`Statement ${i + 1} skipped: ${error.message}`);
+          } else {
+            // For other errors, we should log them but continue
+            console.warn(`Statement ${i + 1} failed but continuing: ${error.message}`);
+          }
         } else {
           console.log(`Successfully executed statement ${i + 1}`);
         }

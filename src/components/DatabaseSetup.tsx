@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { executeSchema, isSchemaSetup } from '@/lib/schemaUtils';
 import { Separator } from '@/components/ui/separator';
-import { InfoCircledIcon } from '@radix-ui/react-icons';
+import { InfoCircledIcon, CheckCircledIcon } from '@radix-ui/react-icons';
 
 const DatabaseSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -20,6 +20,8 @@ const DatabaseSetup: React.FC = () => {
   const [adminName, setAdminName] = useState('');
   const [schemaExists, setSchemaExists] = useState<boolean | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [adminCreated, setAdminCreated] = useState(false);
+  const [dbSeeded, setDbSeeded] = useState(false);
 
   useEffect(() => {
     const checkSchema = async () => {
@@ -66,6 +68,7 @@ const DatabaseSetup: React.FC = () => {
     try {
       await seedDatabase();
       setSuccess(true);
+      setDbSeeded(true);
       toast({
         title: "Database Initialized",
         description: "Sample data has been added to your database.",
@@ -112,6 +115,7 @@ const DatabaseSetup: React.FC = () => {
           title: "Admin Created",
           description: `Admin user ${adminEmail} has been created successfully.`,
         });
+        setAdminCreated(true);
         setError(null);
       } else {
         throw new Error('Failed to create admin user');
@@ -150,9 +154,10 @@ const DatabaseSetup: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {schemaExists === true && (
-            <Alert>
-              <AlertTitle>Schema Exists</AlertTitle>
-              <AlertDescription>
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircledIcon className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-700">Schema Exists</AlertTitle>
+              <AlertDescription className="text-green-600">
                 The database schema is already set up in your Supabase project.
               </AlertDescription>
             </Alert>
@@ -171,8 +176,10 @@ const DatabaseSetup: React.FC = () => {
             <AlertDescription className="mt-2">
               <p>Before proceeding, ensure you've completed these steps in your Supabase project:</p>
               <ol className="list-decimal list-inside mt-2 ml-2 space-y-1">
-                <li>Create a new SQL function in the SQL Editor called <code>exec_sql</code>:</li>
-                <pre className="bg-slate-100 p-2 rounded text-xs mt-1 mb-2 overflow-x-auto">
+                <li>
+                  Create a new SQL function in the SQL Editor called <code>exec_sql</code>:
+                </li>
+                <pre className="bg-slate-100 p-2 rounded-md mt-1 mb-2 overflow-x-auto">
                   {`CREATE OR REPLACE FUNCTION exec_sql(sql_query TEXT)
 RETURNS VOID
 LANGUAGE plpgsql
@@ -183,8 +190,10 @@ BEGIN
 END;
 $$;`}
                 </pre>
-                <li>Enable this function for RPC calls:</li>
-                <pre className="bg-slate-100 p-2 rounded text-xs mt-1 overflow-x-auto">
+                <li>
+                  Enable this function for RPC calls:
+                </li>
+                <pre className="bg-slate-100 p-2 rounded-md mt-1 overflow-x-auto">
                   {`CREATE OR REPLACE FUNCTION public.exec_sql(sql_query text)
  RETURNS void
  LANGUAGE plpgsql
@@ -210,7 +219,7 @@ $function$;`}
             disabled={loading}
             className="w-full"
           >
-            {loading ? 'Creating Schema...' : 'Create Database Schema'}
+            {loading ? 'Creating Schema...' : schemaExists ? 'Recreate Schema' : 'Create Database Schema'}
           </Button>
         </CardFooter>
       </Card>
@@ -223,11 +232,22 @@ $function$;`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {success && !error && (
-            <Alert>
-              <AlertTitle>Success!</AlertTitle>
-              <AlertDescription>
-                Database has been initialized with sample data.
+          {adminCreated && (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircledIcon className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-700">Admin Created</AlertTitle>
+              <AlertDescription className="text-green-600">
+                Admin user has been created successfully.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {dbSeeded && (
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircledIcon className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-700">Database Seeded</AlertTitle>
+              <AlertDescription className="text-green-600">
+                Sample data has been added to your database.
               </AlertDescription>
             </Alert>
           )}
