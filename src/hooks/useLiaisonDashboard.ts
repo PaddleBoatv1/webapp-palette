@@ -11,7 +11,6 @@ interface LiaisonProfile {
   id: string;
   user_id: string;
   is_active: boolean;
-  current_location?: { lat: number; lng: number } | null;
   current_job_count: number;
   max_concurrent_jobs: number;
 }
@@ -81,7 +80,6 @@ interface AssignJobResponse {
 export const useLiaisonDashboard = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Get current liaison profile
   const { data: liaisonProfile, isLoading: isLoadingProfile } = useQuery({
@@ -331,10 +329,26 @@ export const useLiaisonDashboard = () => {
         if (resError) throw resError;
       }
       
+      // Manually decrease the liaison's job count since a completed delivery frees up capacity
+      if (liaisonProfile?.id) {
+        const { error: liaisionError } = await supabase
+          .from('company_liaisons')
+          .update({ 
+            current_job_count: Math.max(0, (liaisonProfile.current_job_count - 1))
+          })
+          .eq('id', liaisonProfile.id);
+          
+        if (liaisionError) {
+          console.error('Error updating liaison capacity:', liaisionError);
+          // We don't want to throw here, as the primary operation succeeded
+        }
+      }
+      
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
       toast({
         title: 'Delivery Completed',
         description: 'You have completed the delivery',
@@ -407,10 +421,26 @@ export const useLiaisonDashboard = () => {
         if (resError) throw resError;
       }
       
+      // Manually decrease the liaison's job count since a completed pickup frees up capacity
+      if (liaisonProfile?.id) {
+        const { error: liaisionError } = await supabase
+          .from('company_liaisons')
+          .update({ 
+            current_job_count: Math.max(0, (liaisonProfile.current_job_count - 1))
+          })
+          .eq('id', liaisonProfile.id);
+          
+        if (liaisionError) {
+          console.error('Error updating liaison capacity:', liaisionError);
+          // We don't want to throw here, as the primary operation succeeded
+        }
+      }
+      
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
       toast({
         title: 'Pickup Completed',
         description: 'You have completed the pickup',
@@ -440,6 +470,22 @@ export const useLiaisonDashboard = () => {
         .select();
 
       if (error) throw error;
+      
+      // Manually decrease the liaison's job count since resigning from a job frees up capacity
+      if (liaisonProfile?.id) {
+        const { error: liaisionError } = await supabase
+          .from('company_liaisons')
+          .update({ 
+            current_job_count: Math.max(0, (liaisonProfile.current_job_count - 1))
+          })
+          .eq('id', liaisonProfile.id);
+          
+        if (liaisionError) {
+          console.error('Error updating liaison capacity:', liaisionError);
+          // We don't want to throw here, as the primary operation succeeded
+        }
+      }
+      
       return data;
     },
     onSuccess: () => {
@@ -459,60 +505,6 @@ export const useLiaisonDashboard = () => {
       });
     },
   });
-
-  // Update liaison's current location
-  const updateLocationMutation = useMutation({
-    mutationFn: async (location: { lat: number; lng: number }) => {
-      if (!liaisonProfile?.id) return null;
-
-      const { data, error } = await supabase
-        .from('company_liaisons')
-        .update({ current_location: location })
-        .eq('id', liaisonProfile.id)
-        .select();
-
-      if (error) {
-        console.error('Error updating location:', error);
-        throw error;
-      }
-
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
-    },
-  });
-
-  // Use browser's geolocation to update the liaison's position
-  const updateCurrentLocation = useCallback(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          
-          setCurrentLocation(newLocation);
-          updateLocationMutation.mutate(newLocation);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          toast({
-            title: 'Location Error',
-            description: 'Unable to retrieve your current location. Please enable location services.',
-            variant: 'destructive',
-          });
-        }
-      );
-    } else {
-      toast({
-        title: 'Location Not Supported',
-        description: 'Geolocation is not supported by your browser',
-        variant: 'destructive',
-      });
-    }
-  }, [updateLocationMutation]);
 
   // Format job data for display with proper fallbacks to prevent type errors
   const formatJobsForDisplay = useCallback((jobs: DeliveryJob[]): FormattedJob[] => {
@@ -577,9 +569,5 @@ export const useLiaisonDashboard = () => {
     
     resignJob: (jobId: string) => resignJobMutation.mutate(jobId),
     isResigningJob: resignJobMutation.isPending,
-    
-    updateCurrentLocation,
-    isUpdatingLocation: updateLocationMutation.isPending,
-    currentLocation,
   };
 };

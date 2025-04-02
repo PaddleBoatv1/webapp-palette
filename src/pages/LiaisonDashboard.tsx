@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Clock, MapPin, User, Truck, ShieldCheck, MapPinned, AlertTriangle } from "lucide-react";
+import { LogOut, Clock, MapPin, User, Truck, ShieldCheck, AlertTriangle } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiaisonDashboard } from '@/hooks/useLiaisonDashboard';
@@ -31,20 +31,8 @@ const LiaisonDashboard = () => {
     completePickup,
     resignJob,
     liaisonProfile,
-    updateCurrentLocation
   } = useLiaisonDashboard();
   const [jobInFocus, setJobInFocus] = useState<string | null>(null);
-
-  // Get location on load
-  useEffect(() => {
-    updateCurrentLocation();
-    // Refresh location every 5 minutes
-    const interval = setInterval(() => {
-      updateCurrentLocation();
-    }, 300000);
-    
-    return () => clearInterval(interval);
-  }, [updateCurrentLocation]);
 
   const handleLogout = async () => {
     await logout();
@@ -68,7 +56,7 @@ const LiaisonDashboard = () => {
     if (jobType === 'delivery') {
       return <Truck className="h-5 w-5 text-blue-500" />;
     } else if (jobType === 'pickup') {
-      return <MapPinned className="h-5 w-5 text-green-500" />;
+      return <MapPin className="h-5 w-5 text-green-500" />;
     }
     return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
   };
