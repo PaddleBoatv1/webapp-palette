@@ -66,15 +66,32 @@ const AuthCallback: React.FC = () => {
           // Clean up
           sessionStorage.removeItem('auth_hash');
           
-          // Success message
-          toast({
-            title: "Authentication Successful",
-            description: "You have been logged in successfully",
-          });
-          
-          // Redirect to dashboard
-          window.location.href = '/dashboard';
-          return;
+          // Get user role
+          if (data.user) {
+            const { data: userData, error: userError } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', data.user.id)
+              .single();
+              
+            if (userError && userError.code !== 'PGRST116') {
+              console.error("Error fetching user role:", userError);
+            }
+            
+            // Success message
+            toast({
+              title: "Authentication Successful",
+              description: "You have been logged in successfully",
+            });
+            
+            // Redirect based on role
+            if (userData?.role === 'admin') {
+              window.location.href = '/admin';
+            } else {
+              window.location.href = '/dashboard';
+            }
+            return;
+          }
         }
         
         // Check for existing session as fallback
@@ -87,14 +104,29 @@ const AuthCallback: React.FC = () => {
         if (session) {
           console.log("Using existing session");
           
+          // Get user role
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (userError && userError.code !== 'PGRST116') {
+            console.error("Error fetching user role:", userError);
+          }
+          
           // Success message
           toast({
             title: "Authentication Successful",
             description: "You have been logged in successfully",
           });
           
-          // Redirect to dashboard
-          window.location.href = '/dashboard';
+          // Redirect based on role
+          if (userData?.role === 'admin') {
+            window.location.href = '/admin';
+          } else {
+            window.location.href = '/dashboard';
+          }
           return;
         }
         

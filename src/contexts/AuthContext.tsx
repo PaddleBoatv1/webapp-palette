@@ -16,9 +16,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearAllAuthData: () => Promise<void>;
 }
@@ -78,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Only use setTimeout for async operations to prevent potential auth deadlocks
               setTimeout(async () => {
                 try {
+                  // Check if user exists in the users table
                   const { data: userData, error } = await supabase
                     .from('users')
                     .select('*')
@@ -86,38 +85,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                   if (error && error.code !== 'PGRST116') {
                     console.error("Error fetching user data:", error);
-                    return;
                   }
                   
                   if (!userData) {
                     console.log("Creating new user profile");
+                    // Get user metadata from Google auth
+                    const fullName = session.user.user_metadata?.full_name || 
+                                 session.user.user_metadata?.name || 
+                                 session.user.email?.split('@')[0] || '';
+                    
+                    // Insert new user with customer role by default
                     const { error: insertError } = await supabase
                       .from('users')
                       .insert([{
                         id: session.user.id,
                         email: session.user.email,
-                        full_name: session.user.user_metadata?.full_name || 
-                                session.user.user_metadata?.name || 
-                                session.user.email?.split('@')[0] || '',
-                        role: 'customer'
+                        full_name: fullName,
+                        role: 'customer' // Default role
                       }]);
                     
                     if (insertError) {
                       console.error("Error creating user profile:", insertError);
                     }
+                    
+                    // Refetch user data after insertion
+                    const { data: newUserData, error: refetchError } = await supabase
+                      .from('users')
+                      .select('*')
+                      .eq('id', session.user.id)
+                      .single();
+                      
+                    if (refetchError) {
+                      console.error("Error fetching new user data:", refetchError);
+                    } else {
+                      // Update the user state with the newly created profile
+                      setUser({
+                        id: session.user.id,
+                        email: session.user.email || '',
+                        name: newUserData.full_name,
+                        photoUrl: session.user.user_metadata?.avatar_url,
+                        role: newUserData.role
+                      });
+                    }
+                  } else {
+                    // User exists, update the user state with the fetched profile
+                    setUser({
+                      id: session.user.id,
+                      email: session.user.email || '',
+                      name: userData.full_name,
+                      photoUrl: session.user.user_metadata?.avatar_url,
+                      role: userData.role
+                    });
                   }
-                  
-                  // Update the user state with the session data
-                  setUser({
-                    id: session.user.id,
-                    email: session.user.email || '',
-                    name: userData?.full_name || 
-                         session.user.user_metadata?.full_name || 
-                         session.user.user_metadata?.name || 
-                         session.user.email?.split('@')[0] || '',
-                    photoUrl: session.user.user_metadata?.avatar_url,
-                    role: userData?.role || 'customer'
-                  });
                 } catch (err) {
                   console.error("Error processing auth state change:", err);
                 }
@@ -150,16 +169,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error("Error fetching user data:", userError);
           }
           
-          setUser({
+          setUser(userData ? {
             id: data.session.user.id,
             email: data.session.user.email || '',
-            name: userData?.full_name || 
-                 data.session.user.user_metadata?.full_name || 
-                 data.session.user.user_metadata?.name || 
-                 data.session.user.email?.split('@')[0] || '',
+            name: userData.full_name,
             photoUrl: data.session.user.user_metadata?.avatar_url,
-            role: userData?.role || 'customer'
-          });
+            role: userData.role
+          } : null);
         } else {
           console.log("No existing session found");
         }
@@ -201,91 +217,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) throw error;
-      
-      if (data.user) {
-        // After successful login, fetch user profile data to get the role
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role, full_name')
-          .eq('id', data.user.id)
-          .single();
-        
-        if (userError && userError.code !== 'PGRST116') {
-          console.error("Error fetching user role:", userError);
-        }
-        
-        toast({
-          title: "Login Successful",
-          description: "You have been logged in successfully",
-        });
-        
-        // Navigate based on role
-        if (userData?.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/dashboard');
-        }
-      }
-    } catch (error: any) {
-      console.error('Login error:', error);
-      toast({
-        title: "Login Failed",
-        description: error.message || "Please check your credentials and try again",
-        variant: "destructive",
-      });
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const signup = async (name: string, email: string, password: string) => {
-    try {
-      setIsLoading(true);
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name
-          }
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Signup Successful",
-        description: "Your account has been created successfully",
-      });
-      
-      // No need to manually set user state or create profile -
-      // the onAuthStateChange handler will do this automatically
-      
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      toast({
-        title: "Signup Failed",
-        description: error.message || "There was an issue creating your account",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const logout = async () => {
     try {
       setIsLoading(true);
@@ -318,9 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user, 
       isLoading, 
       isAuthenticated: !!user, 
-      login, 
       loginWithGoogle, 
-      signup, 
       logout,
       clearAllAuthData
     }}>

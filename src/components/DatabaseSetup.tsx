@@ -1,24 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { seedDatabase, createAdminUser } from '@/lib/adminUtils';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { seedDatabase } from '@/lib/adminUtils';
 import { toast } from '@/hooks/use-toast';
 import { executeSchema, isSchemaSetup } from '@/lib/schemaUtils';
-import { Separator } from '@/components/ui/separator';
-import { InfoCircledIcon, CheckCircledIcon } from '@radix-ui/react-icons';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { User, InfoCircledIcon, CheckCircledIcon } from '@radix-ui/react-icons';
 
 const DatabaseSetup: React.FC = () => {
+  const { user, loginWithGoogle, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminName, setAdminName] = useState('');
   const [schemaExists, setSchemaExists] = useState<boolean | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [adminCreated, setAdminCreated] = useState(false);
   const [dbSeeded, setDbSeeded] = useState(false);
 
@@ -30,6 +27,13 @@ const DatabaseSetup: React.FC = () => {
     
     checkSchema();
   }, [success]);
+
+  // Check if the current user is already an admin
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      setAdminCreated(true);
+    }
+  }, [user]);
 
   const handleSchemaSetup = async () => {
     setLoading(true);
@@ -85,22 +89,9 @@ const DatabaseSetup: React.FC = () => {
     }
   };
 
-  const validatePassword = (password: string) => {
-    if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters long');
-      return false;
-    }
-    setPasswordError(null);
-    return true;
-  };
-
-  const handleCreateAdmin = async () => {
-    if (!adminEmail || !adminPassword || !adminName) {
-      setError('Please fill in all admin user fields');
-      return;
-    }
-
-    if (!validatePassword(adminPassword)) {
+  const handlePromoteToAdmin = async () => {
+    if (!user) {
+      setError("You must be logged in to become an admin");
       return;
     }
 
@@ -108,33 +99,27 @@ const DatabaseSetup: React.FC = () => {
     setError(null);
     
     try {
-      const admin = await createAdminUser(adminEmail, adminPassword, adminName);
-      if (admin) {
-        toast({
-          title: "Admin Created",
-          description: `Admin user ${adminEmail} has been created successfully. You can now login with these credentials.`,
-        });
-        setAdminCreated(true);
-        setError(null);
-      } else {
-        throw new Error('Failed to create admin user');
-      }
+      // Update the user's role to admin in the database
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ role: 'admin' })
+        .eq('id', user.id);
+        
+      if (updateError) throw updateError;
+      
+      // Update local state to reflect the change
+      setAdminCreated(true);
+      
+      toast({
+        title: "Admin Created",
+        description: `Your account has been promoted to admin. Please log out and log back in for the changes to take effect.`,
+      });
     } catch (err: any) {
-      console.error('Error creating admin:', err);
-      let errorMessage = 'Failed to create admin user.';
-      
-      if (err.message) {
-        errorMessage = err.message;
-      } else if (err.error_description) {
-        errorMessage = err.error_description;
-      } else if (typeof err === 'object') {
-        errorMessage = JSON.stringify(err);
-      }
-      
-      setError(errorMessage);
+      console.error('Error promoting to admin:', err);
+      setError(err.message || 'Failed to promote user to admin');
       toast({
         title: "Admin Creation Failed",
-        description: errorMessage,
+        description: err.message || "There was an error promoting your account to admin.",
         variant: "destructive",
       });
     } finally {
@@ -236,7 +221,7 @@ $function$;`}
               <CheckCircledIcon className="h-4 w-4 text-green-600" />
               <AlertTitle className="text-green-700">Admin Created</AlertTitle>
               <AlertDescription className="text-green-600">
-                Admin user has been created successfully.
+                Your account has been set as an admin. Log out and log back in for the changes to take effect.
               </AlertDescription>
             </Alert>
           )}
@@ -253,50 +238,43 @@ $function$;`}
           
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Create Admin User</h3>
-            <div className="grid gap-2">
-              <Label htmlFor="adminEmail">Admin Email</Label>
-              <Input
-                id="adminEmail"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@example.com"
-              />
-            </div>
             
-            <div className="grid gap-2">
-              <Label htmlFor="adminPassword">Admin Password</Label>
-              <Input
-                id="adminPassword"
-                type="password"
-                value={adminPassword}
-                onChange={(e) => {
-                  setAdminPassword(e.target.value);
-                  validatePassword(e.target.value);
-                }}
-                placeholder="••••••••"
-              />
-              {passwordError && (
-                <p className="text-sm text-red-500">{passwordError}</p>
-              )}
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="adminName">Admin Name</Label>
-              <Input
-                id="adminName"
-                value={adminName}
-                onChange={(e) => setAdminName(e.target.value)}
-                placeholder="Admin User"
-              />
-            </div>
-            
-            <Button 
-              onClick={handleCreateAdmin} 
-              disabled={loading || !adminEmail || !adminPassword || !adminName || !schemaExists || adminPassword.length < 6}
-              className="w-full"
-            >
-              {loading ? 'Creating...' : 'Create Admin User'}
-            </Button>
+            {!isAuthenticated ? (
+              <div className="text-center">
+                <p className="mb-4">Sign in with Google to create an admin account</p>
+                <Button 
+                  onClick={loginWithGoogle} 
+                  disabled={loading}
+                  className="w-full"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Sign in with Google
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Alert className="mb-4 bg-blue-50 border-blue-200">
+                  <InfoCircledIcon className="h-4 w-4 text-blue-500" />
+                  <AlertDescription className="text-sm text-gray-700">
+                    Logged in as: <span className="font-semibold">{user?.email}</span>
+                  </AlertDescription>
+                </Alert>
+                
+                <Button 
+                  onClick={handlePromoteToAdmin}
+                  disabled={loading || adminCreated || !schemaExists}
+                  className="w-full"
+                >
+                  {loading ? 'Promoting...' : adminCreated ? 'Already an Admin' : 'Promote to Admin'}
+                </Button>
+                
+                {adminCreated && (
+                  <p className="text-sm text-green-600 mt-2 text-center">
+                    You now have admin privileges. You may need to log out and log back in for all changes to take effect.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
         <CardFooter>
