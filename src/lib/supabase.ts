@@ -1,11 +1,23 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // Use direct credentials for this project
 const supabaseUrl = 'https://vstqtcvwnvkcdrxteubg.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzdHF0Y3Z3bnZrY2RyeHRldWJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1MTk0NDcsImV4cCI6MjA1OTA5NTQ0N30.NdXDXoEyNmW309tSXCTiFu_MPmpP1TrD0FKPgf-nK2w';
 
-// Create the Supabase client with the provided credentials
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create the Supabase client with improved options
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true
+  },
+  global: {
+    fetch: (...args) => {
+      console.log('Supabase fetch request:', args[0]);
+      return fetch(...args);
+    }
+  }
+});
 
 // Helper function to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {

@@ -1,9 +1,6 @@
 
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 import {
   Table,
   TableBody,
@@ -36,170 +33,32 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Ship, MapPin, LayoutDashboard, Filter } from "lucide-react";
+import { Loader2, Plus, Ship, MapPin, LayoutDashboard, Filter, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import ZoneManager from "@/components/admin/ZoneManager";
-import { parseCoordinates, formatCoordinate } from "@/lib/utils";
+import { formatStatus, getStatusBadgeVariant } from "@/lib/utils";
+import { useAdminDashboard } from "@/hooks/useAdminDashboard";
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [assignBoatDialogOpen, setAssignBoatDialogOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [selectedBoatId, setSelectedBoatId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("reservations");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-
-  // Query to fetch all reservations with optional status filter
-  const { data: reservations, isLoading: isLoadingReservations } = useQuery({
-    queryKey: ['reservations', statusFilter],
-    queryFn: async () => {
-      let query = supabase
-        .from('reservations')
-        .select(`
-          *,
-          users(email, full_name),
-          boats(*),
-          start_zone:zones(id, zone_name),
-          end_zone:zones(id, zone_name)
-        `)
-        .order('created_at', { ascending: false });
-        
-      // Apply status filter if not 'all'
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-        
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  // Query to fetch pending reservations specifically (for quick access)
-  const { data: pendingReservations } = useQuery({
-    queryKey: ['pendingReservations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('reservations')
-        .select(`
-          *,
-          users(email, full_name),
-          start_zone:zones(id, zone_name),
-          end_zone:zones(id, zone_name)
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: availableBoats, isLoading: isLoadingBoats } = useQuery({
-    queryKey: ['availableBoats'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('boats')
-        .select('*')
-        .eq('status', 'available');
-        
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const { data: zones, isLoading: isLoadingZones } = useQuery({
-    queryKey: ['zones'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('zones')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  const assignBoatMutation = useMutation({
-    mutationFn: async ({ reservationId, boatId }: { reservationId: string, boatId: string }) => {
-      const { error: boatError } = await supabase
-        .from('boats')
-        .update({ status: 'reserved' })
-        .eq('id', boatId);
-        
-      if (boatError) throw boatError;
-      
-      const { data, error } = await supabase
-        .from('reservations')
-        .update({ 
-          boat_id: boatId, 
-          status: 'confirmed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', reservationId)
-        .select();
-        
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reservations'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingReservations'] });
-      queryClient.invalidateQueries({ queryKey: ['availableBoats'] });
-      
-      toast({
-        title: "Boat Assigned",
-        description: "The reservation has been confirmed and a boat has been assigned."
-      });
-      
-      setAssignBoatDialogOpen(false);
-    },
-    onError: (error) => {
-      console.error('Error assigning boat:', error);
-      toast({
-        title: "Assignment Failed",
-        description: "There was an error assigning the boat. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Update reservation status mutation
-  const updateReservationStatusMutation = useMutation({
-    mutationFn: async ({ reservationId, newStatus }: { reservationId: string, newStatus: string }) => {
-      const { data, error } = await supabase
-        .from('reservations')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', reservationId)
-        .select();
-        
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reservations'] });
-      queryClient.invalidateQueries({ queryKey: ['pendingReservations'] });
-      
-      toast({
-        title: "Status Updated",
-        description: "The reservation status has been successfully updated."
-      });
-    },
-    onError: (error) => {
-      console.error('Error updating status:', error);
-      toast({
-        title: "Update Failed",
-        description: "There was an error updating the reservation status.",
-        variant: "destructive"
-      });
-    }
-  });
+  
+  const {
+    reservations,
+    pendingReservations,
+    availableBoats,
+    isLoadingReservations,
+    isLoadingBoats,
+    isReservationsError,
+    reservationsError,
+    statusFilter,
+    setStatusFilter,
+    assignBoatMutation,
+    updateReservationStatusMutation
+  } = useAdminDashboard();
 
   const handleAssignBoat = (reservation: any) => {
     setSelectedReservation(reservation);
@@ -283,26 +142,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Helper function to get appropriate badge color for status
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return "bg-yellow-100 text-yellow-800";
-      case 'confirmed':
-        return "bg-blue-100 text-blue-800";
-      case 'in_progress':
-        return "bg-purple-100 text-purple-800";
-      case 'awaiting_pickup':
-        return "bg-orange-100 text-orange-800";
-      case 'completed':
-        return "bg-green-100 text-green-800";
-      case 'canceled':
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   if (isLoadingReservations || isLoadingBoats) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -363,7 +202,15 @@ const AdminDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {reservations?.length === 0 ? (
+                {isReservationsError ? (
+                  <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center mb-4">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    <div>
+                      <h4 className="font-medium">Error loading reservations</h4>
+                      <p className="text-sm">{reservationsError?.message || "Please try again later"}</p>
+                    </div>
+                  </div>
+                ) : reservations?.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     No reservations found matching the selected filter
                   </div>
@@ -400,7 +247,7 @@ const AdminDashboard = () => {
                             </TableCell>
                             <TableCell>
                               <Badge className={getStatusBadgeVariant(reservation.status)}>
-                                {reservation.status.charAt(0).toUpperCase() + reservation.status.slice(1)}
+                                {formatStatus(reservation.status)}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -519,7 +366,11 @@ const AdminDashboard = () => {
         </TabsContent>
         
         <TabsContent value="zones">
-          <ZoneManager zones={zones || []} isLoading={isLoadingZones} />
+          <Card>
+            <CardContent className="pt-6">
+              <ZoneManager zones={[]} isLoading={false} />
+            </CardContent>
+          </Card>
         </TabsContent>
         
         <TabsContent value="boats">
