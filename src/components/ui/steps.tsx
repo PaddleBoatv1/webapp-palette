@@ -65,7 +65,8 @@ export const Steps = ({ currentStep, className, children }: StepsProps) => {
   return (
     <div className={cn("flex", className)}>
       {steps.map((step, i) => {
-        if (React.isValidElement(step)) {
+        if (React.isValidElement<StepProps>(step)) {
+          // Pass props explicitly to fix TypeScript error
           return React.cloneElement(step, {
             key: i,
             isActive: currentStep === i,

@@ -23,7 +23,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-blue-600">PaddleRide</h1>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">Welcome, {user?.full_name || user?.email || 'User'}</span>
+              <span className="text-gray-600">Welcome, {user?.email || 'User'}</span>
               {user?.role === 'admin' && (
                 <Link to="/admin">
                   <Button variant="outline" size="sm">

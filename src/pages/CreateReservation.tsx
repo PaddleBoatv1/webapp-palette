@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Steps, Step } from "@/components/ui/steps";
 import { Loader2 } from "lucide-react";
+import { Reservation } from "@/lib/supabase";
 
 const CreateReservation = () => {
   const { user } = useAuth();
@@ -63,7 +64,7 @@ const CreateReservation = () => {
   const handleSubmitReservation = () => {
     if (!user?.id) return;
     
-    const reservation = {
+    const reservation: Partial<Reservation> = {
       user_id: user.id,
       status: 'pending',
       start_zone_id: formData.startZoneId,

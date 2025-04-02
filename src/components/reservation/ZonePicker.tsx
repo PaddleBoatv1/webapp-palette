@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Zone } from "@/lib/supabase";
 import { MapPin, Navigation } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // Google Maps API key should be in your Supabase secrets or directly in the code
 // since it's a frontend-only public key
