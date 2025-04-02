@@ -229,7 +229,40 @@ export const useLiaisonDashboard = () => {
         throw new Error('You have reached your maximum job capacity');
       }
 
-      // Use the database function to safely assign the job
+      // Check if the liaison is already assigned to another job for the same reservation
+      // This prevents double-counting when assigning both delivery and pickup jobs
+      const { data: existingJobs, error: existingJobsError } = await supabase
+        .from('delivery_jobs')
+        .select('*')
+        .eq('reservation_id', jobData.reservation_id)
+        .eq('liaison_id', liaisonProfile.id);
+        
+      if (existingJobsError) {
+        console.error('Error checking existing jobs:', existingJobsError);
+      } else if (existingJobs && existingJobs.length > 0) {
+        console.log('Liaison already has a job for this reservation, not incrementing count');
+        
+        // Just update the job status without increasing the count
+        const { data, error } = await supabase
+          .from('delivery_jobs')
+          .update({ 
+            liaison_id: liaisonProfile.id,
+            status: 'assigned',
+            assigned_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId)
+          .select();
+          
+        if (error) {
+          console.error('Error updating job without incrementing count:', error);
+          throw new Error(error.message || 'Failed to update job');
+        }
+        
+        return { success: true, message: 'Job assigned successfully' };
+      }
+
+      // Use the database function to safely assign the job when it's a new reservation
       const { data, error } = await supabase
         .rpc('assign_delivery_job', {
           job_id: jobId,
