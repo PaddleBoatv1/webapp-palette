@@ -6,10 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Zone } from "@/lib/supabase";
 import { MapPin, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { geoJSONToLatLng } from "@/lib/googleMapsUtils";
 
-// Google Maps API key should be in your Supabase secrets or directly in the code
-// since it's a frontend-only public key
-const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY";
+// Add your Google Maps API key
+const GOOGLE_MAPS_API_KEY = "AIzaSyAEohpaXRaceIHcyWwsRuTGemtEH-IRnkc";
 
 interface ZonePickerProps {
   zones: Zone[];
@@ -25,11 +25,11 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
   const [selectedEndZone, setSelectedEndZone] = useState<Zone | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Load Google Maps API
+  // Load Google Maps API with necessary libraries
   useEffect(() => {
     if (!window.google) {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,geometry`;
       script.async = true;
       script.defer = true;
       script.onload = () => setMapLoaded(true);
@@ -55,6 +55,35 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
     });
 
     setMap(newMap);
+
+    // Add places search box
+    const input = document.createElement('input');
+    input.className = 'controls';
+    input.type = 'text';
+    input.placeholder = 'Search for a location';
+    input.style.margin = '10px';
+    input.style.padding = '8px';
+    input.style.borderRadius = '4px';
+    input.style.width = '250px';
+    
+    newMap.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+    
+    const searchBox = new google.maps.places.SearchBox(input);
+    
+    // Listen for the event fired when the user selects a prediction and retrieve
+    // more details for that place.
+    searchBox.addListener('places_changed', () => {
+      const places = searchBox.getPlaces();
+      if (!places || places.length === 0) return;
+      
+      // Get the first place
+      const place = places[0];
+      if (!place.geometry || !place.geometry.location) return;
+      
+      // Center map on searched location
+      newMap.setCenter(place.geometry.location);
+      newMap.setZoom(15);
+    });
 
     // Try to get user's location
     if (navigator.geolocation) {

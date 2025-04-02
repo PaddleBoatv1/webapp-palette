@@ -49,6 +49,34 @@ export const calculateETA = (
   return timeInMinutes;
 };
 
+// Calculate ETA using Google Maps Directions API (more accurate)
+export const calculateETAWithDirections = (
+  origin: google.maps.LatLngLiteral,
+  destination: google.maps.LatLngLiteral,
+  callback: (minutes: number) => void
+): void => {
+  const directionsService = new google.maps.DirectionsService();
+  
+  directionsService.route(
+    {
+      origin: origin,
+      destination: destination,
+      travelMode: google.maps.TravelMode.WALKING // Closest to paddleboat speed
+    },
+    (result, status) => {
+      if (status === google.maps.DirectionsStatus.OK && result) {
+        // Get the estimated duration in minutes
+        const durationInMinutes = Math.ceil(result.routes[0].legs[0].duration.value / 60);
+        callback(durationInMinutes);
+      } else {
+        // Fall back to our basic calculation
+        const minutes = calculateETA(origin, destination);
+        callback(minutes);
+      }
+    }
+  );
+};
+
 // Helper function to convert degrees to radians
 const toRad = (degrees: number): number => {
   return degrees * Math.PI / 180;
