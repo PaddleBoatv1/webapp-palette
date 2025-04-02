@@ -8,7 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { executeSchema, isSchemaSetup } from '@/lib/schemaUtils';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, InfoCircledIcon, CheckCircledIcon } from '@radix-ui/react-icons';
+import { CheckCircle, Info, User as UserIcon } from 'lucide-react';
 
 const DatabaseSetup: React.FC = () => {
   const { user, loginWithGoogle, isAuthenticated } = useAuth();
@@ -139,7 +139,7 @@ const DatabaseSetup: React.FC = () => {
         <CardContent className="space-y-4">
           {schemaExists === true && (
             <Alert className="bg-green-50 border-green-200">
-              <CheckCircledIcon className="h-4 w-4 text-green-600" />
+              <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertTitle className="text-green-700">Schema Exists</AlertTitle>
               <AlertDescription className="text-green-600">
                 The database schema is already set up in your Supabase project.
@@ -155,7 +155,7 @@ const DatabaseSetup: React.FC = () => {
           )}
           
           <Alert>
-            <InfoCircledIcon className="h-4 w-4 mr-2" />
+            <Info className="h-4 w-4 mr-2" />
             <AlertTitle>Important Setup Steps</AlertTitle>
             <AlertDescription className="mt-2">
               <p>Before proceeding, ensure you've completed these steps in your Supabase project:</p>
@@ -218,7 +218,7 @@ $function$;`}
         <CardContent className="space-y-4">
           {adminCreated && (
             <Alert className="bg-green-50 border-green-200">
-              <CheckCircledIcon className="h-4 w-4 text-green-600" />
+              <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertTitle className="text-green-700">Admin Created</AlertTitle>
               <AlertDescription className="text-green-600">
                 Your account has been set as an admin. Log out and log back in for the changes to take effect.
@@ -228,7 +228,7 @@ $function$;`}
           
           {dbSeeded && (
             <Alert className="bg-green-50 border-green-200">
-              <CheckCircledIcon className="h-4 w-4 text-green-600" />
+              <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertTitle className="text-green-700">Database Seeded</AlertTitle>
               <AlertDescription className="text-green-600">
                 Sample data has been added to your database.
@@ -247,14 +247,14 @@ $function$;`}
                   disabled={loading}
                   className="w-full"
                 >
-                  <User className="mr-2 h-4 w-4" />
+                  <UserIcon className="mr-2 h-4 w-4" />
                   Sign in with Google
                 </Button>
               </div>
             ) : (
               <div>
                 <Alert className="mb-4 bg-blue-50 border-blue-200">
-                  <InfoCircledIcon className="h-4 w-4 text-blue-500" />
+                  <Info className="h-4 w-4 text-blue-500" />
                   <AlertDescription className="text-sm text-gray-700">
                     Logged in as: <span className="font-semibold">{user?.email}</span>
                   </AlertDescription>
