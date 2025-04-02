@@ -272,7 +272,7 @@ export const useLiaisonDashboard = () => {
           console.error('Error updating job without incrementing count:', error);
           // Don't throw yet, we'll try the RPC function
         } else if (data && data.length > 0) {
-          console.log('Job assigned successfully via direct update:', data);
+          console.log('Job assigned successfully without incrementing count:', data);
           return { success: true, message: 'Job assigned successfully' };
         }
         
@@ -318,13 +318,7 @@ export const useLiaisonDashboard = () => {
       }
 
       // Handle the response from the RPC function
-      const response = data as unknown as AssignJobResponse;
-      
-      if (!response.success) {
-        throw new Error(response.message || 'Could not assign job');
-      }
-
-      return response;
+      return data as AssignJobResponse;
     },
     onSuccess: (_, jobId) => {
       // Update queries

@@ -26,7 +26,7 @@ export const supabase = createClient<Database>(
 
 // Add custom RPC function type declarations
 declare module '@supabase/supabase-js' {
-  interface SupabaseClient<Schema extends any> {
+  interface SupabaseClient<Database> {
     rpc<T = any>(
       fn: 
         | "assign_delivery_job" 
@@ -34,9 +34,9 @@ declare module '@supabase/supabase-js' {
         | "increment_count" 
         | "is_admin" 
         | "is_liaison"
-        | "update_delivery_job_assignment", // Add the new function here
+        | "update_delivery_job_assignment", 
       params?: object,
       options?: any
-    ): import('@supabase/supabase-js').SupabasePromise<{ data: T, error: Error }>;
+    ): { data: T | null; error: Error | null };
   }
 }
