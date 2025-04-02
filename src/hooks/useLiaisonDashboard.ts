@@ -1,249 +1,419 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 
-export function useLiaisonDashboard(userId?: string) {
-  const queryClient = useQueryClient();
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+export interface Reservation {
+  id: string;
+  status: string;
+  users: {
+    id: string;
+    email: string;
+    full_name: string;
+    phone_number: string;
+  }[];
+  start_zone: {
+    id: string;
+    zone_name: string;
+    coordinates: any;
+  }[];
+  end_zone: {
+    id: string;
+    zone_name: string;
+    coordinates: any;
+  }[];
+}
 
-  // Query to get the liaison ID from user ID
-  const { data: liaisonData } = useQuery({
-    queryKey: ['liaisonData', userId],
-    queryFn: async () => {
-      if (!userId) return null;
+export interface DeliveryJob {
+  id: string;
+  reservation_id: string;
+  reservation: Reservation;
+  liaison_id: string;
+  job_type: 'delivery' | 'pickup';
+  status: 'available' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  assigned_at: string;
+  completed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const useLiaisonDashboard = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [liaisonId, setLiaisonId] = useState<string | null>(null);
+
+  // Get the liaison ID for the current user
+  useEffect(() => {
+    const fetchLiaisonId = async () => {
+      if (!user) return;
       
       const { data, error } = await supabase
         .from('company_liaisons')
-        .select('*')
-        .eq('user_id', userId)
+        .select('id')
+        .eq('user_id', user.id)
         .single();
         
       if (error) {
-        console.error('Error fetching liaison data:', error);
-        throw error;
+        console.error('Error fetching liaison ID:', error);
+        return;
       }
       
-      return data;
-    },
-    enabled: !!userId
-  });
+      if (data) {
+        setLiaisonId(data.id);
+      }
+    };
+    
+    fetchLiaisonId();
+  }, [user]);
 
-  // Query to fetch available jobs for assignments
-  const { data: availableJobs, isLoading: isLoadingAvailableJobs } = useQuery({
+  // Query available jobs
+  const { data: availableJobsData, isLoading: isAvailableLoading } = useQuery({
     queryKey: ['availableJobs'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('delivery_jobs')
         .select(`
           id,
+          reservation_id,
           job_type,
           status,
           created_at,
-          reservation:reservation_id(
+          reservation:reservation_id (
             id,
-            users:user_id(id, email, full_name, phone_number),
-            start_zone:start_zone_id(id, zone_name, coordinates),
-            end_zone:end_zone_id(id, zone_name, coordinates),
-            status
+            status,
+            users:user_id (
+              id,
+              email,
+              full_name,
+              phone_number
+            ),
+            start_zone:start_zone_id (
+              id,
+              zone_name,
+              coordinates
+            ),
+            end_zone:end_zone_id (
+              id,
+              zone_name,
+              coordinates
+            )
           )
         `)
-        .eq('status', 'available')
-        .order('created_at', { ascending: false });
+        .eq('status', 'available');
         
       if (error) {
         console.error('Error fetching available jobs:', error);
         throw error;
       }
       
-      // Process the data to ensure correct shape
-      const processedData = data?.map(job => ({
+      // Process the data to ensure all jobs have properly formatted objects
+      return data.map((job: any) => ({
         ...job,
         reservation: {
           ...job.reservation,
-          users: job.reservation?.users || { email: 'Unknown', full_name: '' },
-          start_zone: job.reservation?.start_zone || { zone_name: 'Unknown' },
-          end_zone: job.reservation?.end_zone || { zone_name: 'Unknown' }
+          users: job.reservation?.users ? (Array.isArray(job.reservation.users) ? job.reservation.users : [job.reservation.users]) : [],
+          start_zone: job.reservation?.start_zone ? (Array.isArray(job.reservation.start_zone) ? job.reservation.start_zone : [job.reservation.start_zone]) : [],
+          end_zone: job.reservation?.end_zone ? (Array.isArray(job.reservation.end_zone) ? job.reservation.end_zone : [job.reservation.end_zone]) : []
         }
       }));
-      
-      return processedData || [];
     },
-    refetchInterval: 30000 // Refresh every 30 seconds
+    enabled: !!user,
   });
 
-  // Query to fetch assigned jobs for this liaison
-  const { data: assignedJobs, isLoading: isLoadingAssignedJobs } = useQuery({
-    queryKey: ['assignedJobs', liaisonData?.id, filterStatus],
+  // Query assigned jobs
+  const { data: assignedJobsData, isLoading: isAssignedLoading } = useQuery({
+    queryKey: ['assignedJobs', liaisonId],
     queryFn: async () => {
-      if (!liaisonData?.id) return [];
+      if (!liaisonId) return [];
       
-      let query = supabase
+      const { data, error } = await supabase
         .from('delivery_jobs')
         .select(`
           id,
+          reservation_id,
           job_type,
           status,
-          created_at,
           assigned_at,
           completed_at,
-          reservation:reservation_id(
+          created_at,
+          updated_at,
+          reservation:reservation_id (
             id,
-            users:user_id(id, email, full_name, phone_number),
             status,
-            start_zone:start_zone_id(id, zone_name, coordinates),
-            end_zone:end_zone_id(id, zone_name, coordinates)
+            users:user_id (
+              id,
+              email,
+              full_name,
+              phone_number
+            ),
+            start_zone:start_zone_id (
+              id,
+              zone_name,
+              coordinates
+            ),
+            end_zone:end_zone_id (
+              id,
+              zone_name,
+              coordinates
+            )
           )
         `)
-        .eq('liaison_id', liaisonData.id)
-        .order('created_at', { ascending: false });
-        
-      // Apply status filter if not 'all'
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
-      }
-      
-      const { data, error } = await query;
+        .eq('liaison_id', liaisonId)
+        .in('status', ['assigned', 'in_progress']);
         
       if (error) {
         console.error('Error fetching assigned jobs:', error);
         throw error;
       }
       
-      // Process the data to ensure correct shape
-      const processedData = data?.map(job => ({
+      // Process the data to ensure all jobs have properly formatted objects
+      return data.map((job: any) => ({
         ...job,
         reservation: {
           ...job.reservation,
-          users: job.reservation?.users || { email: 'Unknown', full_name: '' },
-          start_zone: job.reservation?.start_zone || { zone_name: 'Unknown' },
-          end_zone: job.reservation?.end_zone || { zone_name: 'Unknown' }
+          users: job.reservation?.users ? (Array.isArray(job.reservation.users) ? job.reservation.users : [job.reservation.users]) : [],
+          start_zone: job.reservation?.start_zone ? (Array.isArray(job.reservation.start_zone) ? job.reservation.start_zone : [job.reservation.start_zone]) : [],
+          end_zone: job.reservation?.end_zone ? (Array.isArray(job.reservation.end_zone) ? job.reservation.end_zone : [job.reservation.end_zone]) : []
         }
       }));
-      
-      return processedData || [];
     },
-    enabled: !!liaisonData?.id,
-    refetchInterval: 10000 // Refresh every 10 seconds
+    enabled: !!liaisonId,
   });
 
   // Mutation to accept a job
   const acceptJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      if (!liaisonData?.id) throw new Error('Liaison ID not found');
+      if (!liaisonId) throw new Error('Liaison ID not found');
       
-      // Call the RPC function to atomically assign the job
+      // Call the database function to assign the job atomically
       const { data, error } = await supabase
-        .rpc('assign_delivery_job', { 
+        .rpc('assign_delivery_job', {
           job_id: jobId,
-          assign_to_liaison_id: liaisonData.id
+          assign_to_liaison_id: liaisonId
         });
-      
-      if (error) {
-        console.error('Error accepting job:', error);
-        throw error;
-      }
-      
-      if (!data.success) {
-        throw new Error(data.message);
-      }
-      
+        
+      if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['liaisonData'] });
-      
       toast({
-        title: "Job Accepted",
-        description: "The job has been assigned to you successfully."
+        title: 'Job Accepted',
+        description: 'You have successfully accepted this job',
       });
     },
     onError: (error: any) => {
-      console.error('Error accepting job:', error);
       toast({
-        title: "Assignment Failed",
-        description: error.message || "There was an error accepting the job. Please try again.",
-        variant: "destructive"
+        title: 'Error',
+        description: error.message || 'Failed to accept job',
+        variant: 'destructive',
       });
-    }
+    },
   });
 
   // Mutation to update job status
   const updateJobStatusMutation = useMutation({
-    mutationFn: async ({ jobId, newStatus, reservationUpdate = null }: 
-      { jobId: string, newStatus: string, reservationUpdate?: { status: string, id: string } | null }) => {
-      if (!liaisonData?.id) throw new Error('Liaison ID not found');
-      
-      // Start a transaction for job status update
-      const updatePromises = [];
-      
-      // Update job status
-      updatePromises.push(
-        supabase
-          .from('delivery_jobs')
-          .update({ 
-            status: newStatus,
-            updated_at: new Date().toISOString(),
-            completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined
-          })
-          .eq('id', jobId)
-          .eq('liaison_id', liaisonData.id)
-      );
-      
-      // If there's a reservation update, include it
-      if (reservationUpdate) {
-        updatePromises.push(
-          supabase
-            .from('reservations')
-            .update({ 
-              status: reservationUpdate.status,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', reservationUpdate.id)
-        );
-      }
-      
-      // Execute all updates
-      const results = await Promise.all(updatePromises);
-      
-      // Check for errors
-      for (const { error } of results) {
-        if (error) throw error;
-      }
-      
-      return { success: true };
+    mutationFn: async ({ jobId, status }: { jobId: string; status: string }) => {
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({ 
+          status,
+          ...(status === 'in_progress' ? {} : (status === 'completed' ? { completed_at: new Date().toISOString() } : {}))
+        })
+        .eq('id', jobId)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['liaisonData'] });
-      
-      toast({
-        title: "Status Updated",
-        description: "The job status has been updated successfully."
-      });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
     },
     onError: (error: any) => {
-      console.error('Error updating job status:', error);
       toast({
-        title: "Update Failed",
-        description: error.message || "There was an error updating the job status. Please try again.",
-        variant: "destructive"
+        title: 'Error',
+        description: error.message || 'Failed to update job status',
+        variant: 'destructive',
       });
-    }
+    },
   });
 
-  return {
-    liaisonData,
-    availableJobs,
-    assignedJobs,
-    isLoadingAvailableJobs,
-    isLoadingAssignedJobs,
-    filterStatus,
-    setFilterStatus,
-    acceptJobMutation,
-    updateJobStatusMutation
+  // Mutation to update reservation status
+  const updateReservationStatusMutation = useMutation({
+    mutationFn: async ({ reservationId, status }: { reservationId: string; status: string }) => {
+      const { data, error } = await supabase
+        .from('reservations')
+        .update({ status })
+        .eq('id', reservationId)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update reservation status',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Function to resign a job
+  const resignJob = async (jobId: string) => {
+    try {
+      // Get the job details first
+      const { data: jobData, error: jobError } = await supabase
+        .from('delivery_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+        
+      if (jobError) throw jobError;
+      
+      // Update the job status to available and remove liaison assignment
+      const { error } = await supabase
+        .from('delivery_jobs')
+        .update({ 
+          status: 'available',
+          liaison_id: null
+        })
+        .eq('id', jobId);
+        
+      if (error) throw error;
+      
+      // Update the liaison's job count
+      if (liaisonId) {
+        const { error: updateError } = await supabase
+          .from('company_liaisons')
+          .update({ 
+            current_job_count: supabase.rpc('greatest', { a: 0, b: -1 })
+          })
+          .eq('id', liaisonId);
+          
+        if (updateError) throw updateError;
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
+      
+      toast({
+        title: 'Job Resigned',
+        description: 'You have resigned from this job',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to resign job',
+        variant: 'destructive',
+      });
+    }
   };
-}
+
+  // Function to accept a job
+  const acceptJob = (jobId: string) => {
+    acceptJobMutation.mutate(jobId);
+  };
+
+  // Function to start delivery
+  const startDelivery = async (jobId: string) => {
+    try {
+      await updateJobStatusMutation.mutateAsync({ jobId, status: 'in_progress' });
+      toast({
+        title: 'Delivery Started',
+        description: 'You have started the delivery',
+      });
+    } catch (error) {
+      console.error('Error starting delivery:', error);
+    }
+  };
+
+  // Function to complete delivery
+  const completeDelivery = async (jobId: string) => {
+    try {
+      const { data: jobData } = await supabase
+        .from('delivery_jobs')
+        .select('reservation_id')
+        .eq('id', jobId)
+        .single();
+        
+      if (!jobData) throw new Error('Job not found');
+      
+      // Update job status
+      await updateJobStatusMutation.mutateAsync({ jobId, status: 'completed' });
+      
+      // Update reservation status to in_progress (customer can start using the boat)
+      await updateReservationStatusMutation.mutateAsync({ 
+        reservationId: jobData.reservation_id, 
+        status: 'in_progress' 
+      });
+      
+      toast({
+        title: 'Delivery Completed',
+        description: 'You have completed the delivery',
+      });
+    } catch (error) {
+      console.error('Error completing delivery:', error);
+    }
+  };
+
+  // Function to start pickup
+  const startPickup = async (jobId: string) => {
+    try {
+      await updateJobStatusMutation.mutateAsync({ jobId, status: 'in_progress' });
+      toast({
+        title: 'Pickup Started',
+        description: 'You have started the pickup',
+      });
+    } catch (error) {
+      console.error('Error starting pickup:', error);
+    }
+  };
+
+  // Function to complete pickup
+  const completePickup = async (jobId: string) => {
+    try {
+      const { data: jobData } = await supabase
+        .from('delivery_jobs')
+        .select('reservation_id')
+        .eq('id', jobId)
+        .single();
+        
+      if (!jobData) throw new Error('Job not found');
+      
+      // Update job status
+      await updateJobStatusMutation.mutateAsync({ jobId, status: 'completed' });
+      
+      // Update reservation status to completed
+      await updateReservationStatusMutation.mutateAsync({ 
+        reservationId: jobData.reservation_id, 
+        status: 'completed' 
+      });
+      
+      toast({
+        title: 'Pickup Completed',
+        description: 'You have completed the pickup',
+      });
+    } catch (error) {
+      console.error('Error completing pickup:', error);
+    }
+  };
+
+  return {
+    availableJobs: availableJobsData || [],
+    assignedJobs: assignedJobsData || [],
+    isLoading: isAvailableLoading || isAssignedLoading,
+    acceptJob,
+    startDelivery,
+    completeDelivery,
+    startPickup,
+    completePickup,
+    resignJob,
+  };
+};

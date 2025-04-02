@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -10,6 +11,7 @@ interface User {
   photoUrl?: string;
   role?: string;
   full_name?: string;
+  phone_number?: string;
 }
 
 interface AuthContextType {
@@ -19,7 +21,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   clearAllAuthData: () => Promise<void>;
-  signup: (email: string, password: string, metadata?: any) => Promise<any>;
+  signup: (email: string, password: string, metadata?: Record<string, any>) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -90,7 +92,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: session.user.email || '',
         name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
         photoUrl: session.user.user_metadata?.avatar_url,
-        role: userRole
+        role: userRole,
+        full_name: session.user.user_metadata?.full_name,
+        phone_number: session.user.user_metadata?.phone_number
       });
       
       console.log("User authenticated:", session.user.id, "with role:", userRole);
@@ -179,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signup = async (email: string, password: string, metadata = {}) => {
+  const signup = async (email: string, password: string, metadata: Record<string, any> = {}) => {
     try {
       setIsLoading(true);
       
@@ -199,8 +203,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .insert([{ 
             id: data.user.id,
             email: data.user.email,
-            full_name: metadata.full_name,
-            phone_number: metadata.phone_number,
+            full_name: metadata.full_name || '',
+            phone_number: metadata.phone_number || '',
             role: metadata.role || 'customer'
           }]);
         

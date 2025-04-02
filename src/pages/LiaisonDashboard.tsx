@@ -1,482 +1,431 @@
 
 import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LogOut, Clock, MapPin, User, Truck, ShieldCheck, MapPinned, AlertTriangle } from "lucide-react";
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiaisonDashboard } from '@/hooks/useLiaisonDashboard';
-import { formatStatus, getStatusBadgeVariant } from '@/lib/utils';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Table, TableBody, TableCell, TableHead, 
-  TableHeader, TableRow 
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Ship, MapPin, Phone, Mail, Navigation, CheckCircle, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
-
-// Define a custom variant type for Badge to include 'success'
-type CustomBadgeVariant = "default" | "destructive" | "outline" | "secondary" | "success";
-// Extend the Badge component to accept our custom variant
-const CustomBadge = (props: React.ComponentProps<typeof Badge> & { variant?: CustomBadgeVariant }) => {
-  // Map 'success' to an appropriate class name
-  const className = props.variant === 'success' 
-    ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' 
-    : props.className;
-  
-  // Remove 'success' from the variant before passing to Badge
-  const badgeProps = {
-    ...props,
-    variant: props.variant === 'success' ? 'outline' : props.variant,
-    className
-  };
-  
-  return <Badge {...badgeProps} />;
-};
-
-// Define interfaces for typesafety
-interface ReservationUser {
-  id: string;
-  email: string;
-  full_name?: string;
-  phone_number?: string;
-}
-
-interface Zone {
-  id: string;
-  zone_name: string;
-  coordinates?: any;
-}
-
-interface Reservation {
-  id: string;
-  users: ReservationUser;
-  status: string;
-  start_zone?: Zone;
-  end_zone?: Zone;
-}
-
-interface DeliveryJob {
-  id: string;
-  job_type: string;
-  status: string;
-  created_at: string;
-  assigned_at?: string;
-  completed_at?: string;
-  reservation: Reservation;
-  liaison_id?: string;
-}
+import { Badge } from "@/components/ui/badge";
 
 const LiaisonDashboard = () => {
-  const { user } = useAuth();
-  const [selectedJob, setSelectedJob] = useState<DeliveryJob | null>(null);
-  const [jobDetailsOpen, setJobDetailsOpen] = useState(false);
-  
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const {
-    liaisonData,
     availableJobs,
     assignedJobs,
-    isLoadingAvailableJobs,
-    isLoadingAssignedJobs,
-    filterStatus,
-    setFilterStatus,
-    acceptJobMutation,
-    updateJobStatusMutation
-  } = useLiaisonDashboard(user?.id);
+    isLoading,
+    acceptJob,
+    startDelivery,
+    completeDelivery,
+    startPickup,
+    completePickup,
+    resignJob,
+  } = useLiaisonDashboard();
+  const [jobInFocus, setJobInFocus] = useState<string | null>(null);
 
-  const handleAcceptJob = (job: DeliveryJob) => {
-    acceptJobMutation.mutate(job.id);
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
   };
 
-  const openJobDetails = (job: DeliveryJob) => {
-    setSelectedJob(job);
-    setJobDetailsOpen(true);
-  };
-
-  const handleUpdateStatus = (jobId: string, newStatus: string) => {
-    let reservationUpdate = null;
-    
-    // Determine if we need to update the reservation status as well
-    if (selectedJob) {
-      if (newStatus === 'in_progress' && selectedJob.job_type === 'delivery') {
-        // When starting a delivery, update reservation to in_progress
-        reservationUpdate = {
-          id: selectedJob.reservation.id,
-          status: 'in_progress'
-        };
-      } else if (newStatus === 'completed' && selectedJob.job_type === 'pickup') {
-        // When completing a pickup, update reservation to completed
-        reservationUpdate = {
-          id: selectedJob.reservation.id,
-          status: 'completed'
-        };
-      }
+  const getStatusBadge = (status: string) => {
+    if (status === 'assigned') {
+      return <Badge variant="outline">Assigned</Badge>;
+    } else if (status === 'in_progress') {
+      return <Badge variant="secondary">In Progress</Badge>;
+    } else if (status === 'completed') {
+      return <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">Completed</Badge>;
+    } else if (status === 'cancelled') {
+      return <Badge variant="destructive">Cancelled</Badge>;
     }
-    
-    updateJobStatusMutation.mutate({ 
-      jobId, 
-      newStatus,
-      reservationUpdate 
-    });
-    
-    setJobDetailsOpen(false);
-  };
-  
-  const formatJobType = (type: string): string => {
-    return type === 'delivery' ? 'Boat Delivery' : 'Boat Pickup';
-  };
-  
-  const getJobStatusBadgeVariant = (status: string): string => {
-    switch (status) {
-      case 'available':
-        return 'bg-blue-100 text-blue-800';
-      case 'assigned':
-        return 'bg-purple-100 text-purple-800';
-      case 'in_progress':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    return <Badge>Unknown</Badge>;
   };
 
-  const getActionsForJobStatus = (job: DeliveryJob) => {
-    switch (job.status) {
-      case 'assigned':
-        return (
-          <Button size="sm" onClick={() => handleUpdateStatus(job.id, 'in_progress')}>
-            Start {job.job_type === 'delivery' ? 'Delivery' : 'Pickup'}
-          </Button>
-        );
-      case 'in_progress':
-        return (
-          <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleUpdateStatus(job.id, 'completed')}>
-            Complete {job.job_type === 'delivery' ? 'Delivery' : 'Pickup'}
-          </Button>
-        );
-      case 'completed':
-        return (
-          <CustomBadge variant="outline" className="bg-green-50 text-green-800">
-            Completed
-          </CustomBadge>
-        );
-      default:
-        return null;
+  const getJobTypeIcon = (jobType: string) => {
+    if (jobType === 'delivery') {
+      return <Truck className="h-5 w-5 text-blue-500" />;
+    } else if (jobType === 'pickup') {
+      return <MapPinned className="h-5 w-5 text-green-500" />;
     }
+    return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
   };
-
-  if (isLoadingAvailableJobs || isLoadingAssignedJobs) {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-      </div>
-    );
-  }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <header className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Delivery Executive Dashboard</h1>
-            <p className="text-gray-500">Manage your boat deliveries and pickups</p>
-          </div>
-          <div>
-            <div className="text-right">
-              <p className="font-semibold">{user?.full_name || user?.name || user?.email}</p>
-              <Badge variant="outline" className="mt-1">
-                Delivery Executive
-              </Badge>
-            </div>
-            <div className="mt-2 text-right">
-              <CustomBadge variant={liaisonData?.is_active ? "success" : "destructive"}>
-                {liaisonData?.is_active ? 'Active' : 'Inactive'}
-              </CustomBadge>
-              <Badge variant="outline" className="ml-2">
-                Jobs: {liaisonData?.current_job_count || 0}/{liaisonData?.max_concurrent_jobs || 3}
-              </Badge>
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
+      <header className="bg-white shadow">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-green-600">PaddleRide Delivery</h1>
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-600">
+                Welcome, {user?.name || user?.email || 'Executive'} 
+                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                  Delivery Executive
+                </span>
+              </span>
+              <Link to="/dashboard">
+                <Button variant="outline" size="sm">
+                  Dashboard
+                </Button>
+              </Link>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
       </header>
       
-      <Tabs defaultValue="assigned">
-        <TabsList className="mb-6">
-          <TabsTrigger value="assigned" className="flex items-center">
-            <Ship className="mr-2 h-4 w-4" />
-            <span>My Assignments</span>
-          </TabsTrigger>
-          <TabsTrigger value="available" className="flex items-center">
-            <MapPin className="mr-2 h-4 w-4" />
-            <span>Available Jobs</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <h2 className="text-2xl font-bold mb-6">Delivery Dashboard</h2>
         
-        <TabsContent value="assigned">
+        {/* Performance Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>My Assignments</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Jobs</SelectItem>
-                      <SelectItem value="assigned">Assigned</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <CardDescription>
-                View and manage your assigned deliveries and pickups
-              </CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Today's Jobs</CardTitle>
             </CardHeader>
             <CardContent>
-              {!assignedJobs?.length ? (
-                <div className="text-center py-8 text-gray-500">
-                  You don't have any {filterStatus !== 'all' ? filterStatus : ''} jobs assigned at this time.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Assigned</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {assignedJobs?.map((job: DeliveryJob) => (
-                        <TableRow key={job.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openJobDetails(job)}>
-                          <TableCell>
-                            <Badge variant={job.job_type === 'delivery' ? "secondary" : "outline"}>
-                              {formatJobType(job.job_type)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {job.reservation?.users?.full_name || job.reservation?.users?.email || 'Unknown'}
-                          </TableCell>
-                          <TableCell>
-                            {job.job_type === 'delivery' 
-                              ? job.reservation?.start_zone?.zone_name 
-                              : job.reservation?.end_zone?.zone_name || 'Unknown'}
-                          </TableCell>
-                          <TableCell>
-                            {job.assigned_at 
-                              ? format(new Date(job.assigned_at), 'PPp') 
-                              : 'Unknown'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getJobStatusBadgeVariant(job.status)}>
-                              {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {getActionsForJobStatus(job)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+              <div className="text-3xl font-bold">{assignedJobs.length}</div>
+              <p className="text-gray-500 mb-4">Assigned to you</p>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="available">
+          
           <Card>
-            <CardHeader>
-              <CardTitle>Available Jobs</CardTitle>
-              <CardDescription>
-                Pick up new delivery or pickup assignments
-              </CardDescription>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Available Jobs</CardTitle>
             </CardHeader>
             <CardContent>
-              {!availableJobs?.length ? (
-                <div className="text-center py-8 text-gray-500">
-                  There are no available jobs at this time.
-                </div>
+              <div className="text-3xl font-bold">{availableJobs.length}</div>
+              <p className="text-gray-500 mb-4">Ready to accept</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Executive Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold flex items-center text-green-600">
+                <ShieldCheck className="h-5 w-5 mr-2" />
+                Active
+              </div>
+              <p className="text-gray-500 mb-4">Ready for deliveries</p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Job Management Tabs */}
+        <Tabs defaultValue="assigned" className="mb-8">
+          <TabsList className="mb-4">
+            <TabsTrigger value="assigned">
+              <Truck className="h-4 w-4 mr-2" />
+              My Assignments ({assignedJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="available">
+              <MapPin className="h-4 w-4 mr-2" />
+              Available Jobs ({availableJobs.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="assigned">
+            <div className="grid grid-cols-1 gap-4">
+              {isLoading ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex justify-center">
+                      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : assignedJobs.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-gray-500">
+                      <Clock className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                      <p>You don't have any assigned jobs at the moment.</p>
+                      <p className="text-sm mt-2">Check available jobs to accept new assignments.</p>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {availableJobs?.map((job: DeliveryJob) => (
-                    <Card key={job.id} className="overflow-hidden">
-                      <div className={`px-4 py-2 ${job.job_type === 'delivery' ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                        <Badge variant={job.job_type === 'delivery' ? "secondary" : "outline"}>
-                          {formatJobType(job.job_type)}
-                        </Badge>
+                assignedJobs.map((job) => (
+                  <Card key={job.id} className="relative border-l-4 border-l-blue-500">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center">
+                          {getJobTypeIcon(job.job_type)}
+                          <CardTitle className="text-lg ml-2">
+                            {job.job_type === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
+                          </CardTitle>
+                        </div>
+                        {getStatusBadge(job.status)}
                       </div>
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center text-sm">
-                            <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                            {format(new Date(job.created_at), 'PPp')}
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                            {job.job_type === 'delivery' 
-                              ? job.reservation?.start_zone?.zone_name 
-                              : job.reservation?.end_zone?.zone_name || 'Unknown'}
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                            {job.reservation?.users?.email || 'Unknown'}
-                          </div>
-                          <div className="mt-4">
-                            <Button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcceptJob(job);
-                              }}
-                              disabled={acceptJobMutation.isPending || liaisonData?.current_job_count >= liaisonData?.max_concurrent_jobs}
-                              className="w-full"
-                            >
-                              {acceptJobMutation.isPending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Accepting...
-                                </>
-                              ) : (
-                                <>Accept Job</>
-                              )}
-                            </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-start">
+                          <User className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">Customer</div>
+                            <div className="text-sm text-gray-500">
+                              {job.reservation?.users?.[0]?.full_name || 'Unknown Customer'}
+                              <div>{job.reservation?.users?.[0]?.phone_number || 'No phone provided'}</div>
+                            </div>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        
+                        <div className="flex items-start">
+                          <MapPin className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">
+                              {job.job_type === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {job.job_type === 'delivery' 
+                                ? job.reservation?.start_zone?.[0]?.zone_name || 'Unknown Zone'
+                                : job.reservation?.end_zone?.[0]?.zone_name || 'Unknown Zone'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end space-x-2 pt-0">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" onClick={() => setJobInFocus(job.id)}>
+                            Details
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{job.job_type === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
+                            <DialogDescription>
+                              Assignment information and location details
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Customer Information</h4>
+                              <div className="text-sm">
+                                <p><span className="font-medium">Name:</span> {job.reservation?.users?.[0]?.full_name || 'Unknown'}</p>
+                                <p><span className="font-medium">Phone:</span> {job.reservation?.users?.[0]?.phone_number || 'Not provided'}</p>
+                                <p><span className="font-medium">Email:</span> {job.reservation?.users?.[0]?.email || 'Not provided'}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Location Information</h4>
+                              <div className="text-sm">
+                                <p><span className="font-medium">Start Zone:</span> {job.reservation?.start_zone?.[0]?.zone_name || 'Unknown'}</p>
+                                <p><span className="font-medium">End Zone:</span> {job.reservation?.end_zone?.[0]?.zone_name || 'Unknown'}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex justify-end space-x-2 mt-4">
+                            <Button 
+                              variant="outline"
+                              size="sm"
+                              onClick={() => resignJob(job.id)}
+                            >
+                              Resign Job
+                            </Button>
+                            {job.status === 'assigned' && job.job_type === 'delivery' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => startDelivery(job.id)}
+                              >
+                                Start Delivery
+                              </Button>
+                            )}
+                            {job.status === 'in_progress' && job.job_type === 'delivery' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => completeDelivery(job.id)}
+                              >
+                                Complete Delivery
+                              </Button>
+                            )}
+                            {job.status === 'assigned' && job.job_type === 'pickup' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => startPickup(job.id)}
+                              >
+                                Start Pickup
+                              </Button>
+                            )}
+                            {job.status === 'in_progress' && job.job_type === 'pickup' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => completePickup(job.id)}
+                              >
+                                Complete Pickup
+                              </Button>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      {job.status === 'assigned' && job.job_type === 'delivery' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => startDelivery(job.id)}
+                        >
+                          Start Delivery
+                        </Button>
+                      )}
+                      {job.status === 'in_progress' && job.job_type === 'delivery' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => completeDelivery(job.id)}
+                        >
+                          Complete
+                        </Button>
+                      )}
+                      {job.status === 'assigned' && job.job_type === 'pickup' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => startPickup(job.id)}
+                        >
+                          Start Pickup
+                        </Button>
+                      )}
+                      {job.status === 'in_progress' && job.job_type === 'pickup' && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => completePickup(job.id)}
+                        >
+                          Complete
+                        </Button>
+                      )}
+                    </CardFooter>
+                  </Card>
+                ))
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-      
-      {/* Job Details Dialog */}
-      {selectedJob && (
-        <Dialog open={jobDetailsOpen} onOpenChange={setJobDetailsOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                <div className="flex items-center">
-                  <Ship className="h-5 w-5 mr-2 text-blue-500" />
-                  {formatJobType(selectedJob.job_type)} Details
-                </div>
-              </DialogTitle>
-              <DialogDescription>
-                View all details and manage this job
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              <div className="flex justify-between">
-                <Badge className={getJobStatusBadgeVariant(selectedJob.status)}>
-                  {selectedJob.status.charAt(0).toUpperCase() + selectedJob.status.slice(1)}
-                </Badge>
-                <Badge variant="outline">
-                  {format(new Date(selectedJob.created_at), 'PP')}
-                </Badge>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm">Customer Information</h4>
-                <div className="flex items-center text-sm">
-                  <CheckCircle className="h-4 w-4 mr-2 text-gray-500" />
-                  {selectedJob.reservation?.users?.full_name || 'No name provided'}
-                </div>
-                <div className="flex items-center text-sm">
-                  <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                  {selectedJob.reservation?.users?.email || 'No email provided'}
-                </div>
-                <div className="flex items-center text-sm">
-                  <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                  {selectedJob.reservation?.users?.phone_number || 'No phone provided'}
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm">Location</h4>
-                <div className="flex items-center text-sm">
-                  <MapPin className="h-4 w-4 mr-2 text-gray-500" />
-                  <span className="font-medium mr-1">
-                    {selectedJob.job_type === 'delivery' ? 'Delivery to:' : 'Pickup from:'}
-                  </span>
-                  {selectedJob.job_type === 'delivery' 
-                    ? selectedJob.reservation?.start_zone?.zone_name 
-                    : selectedJob.reservation?.end_zone?.zone_name || 'Unknown'}
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-2"
-                  onClick={() => {
-                    // Open in Google Maps - using coordinates if available, otherwise use zone name
-                    const zone = selectedJob.job_type === 'delivery' 
-                      ? selectedJob.reservation?.start_zone
-                      : selectedJob.reservation?.end_zone;
-                      
-                    let mapsUrl;
-                    if (zone?.coordinates) {
-                      const coords = typeof zone.coordinates === 'string' 
-                        ? JSON.parse(zone.coordinates) 
-                        : zone.coordinates;
-                      
-                      if (coords.lat && coords.lng) {
-                        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${coords.lat},${coords.lng}`;
-                      } else {
-                        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(zone.zone_name)}`;
-                      }
-                    } else {
-                      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(zone?.zone_name || '')}`;
-                    }
-                    
-                    window.open(mapsUrl, '_blank');
-                  }}
-                >
-                  <Navigation className="h-4 w-4 mr-2" />
-                  Navigate to Location
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-sm">Reservation Status</h4>
-                <Badge className={getStatusBadgeVariant(selectedJob.reservation?.status || 'unknown')}>
-                  {formatStatus(selectedJob.reservation?.status || 'unknown')}
-                </Badge>
-              </div>
             </div>
-            
-            <DialogFooter>
-              {getActionsForJobStatus(selectedJob)}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+          </TabsContent>
+          
+          <TabsContent value="available">
+            <div className="grid grid-cols-1 gap-4">
+              {isLoading ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex justify-center">
+                      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : availableJobs.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-gray-500">
+                      <Clock className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                      <p>There are no available jobs at the moment.</p>
+                      <p className="text-sm mt-2">Check back later for new assignments.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                availableJobs.map((job) => (
+                  <Card key={job.id} className="relative border-l-4 border-l-green-500">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center">
+                          {getJobTypeIcon(job.job_type)}
+                          <CardTitle className="text-lg ml-2">
+                            {job.job_type === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
+                          </CardTitle>
+                        </div>
+                        <Badge variant="outline">Available</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-start">
+                          <User className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">Customer</div>
+                            <div className="text-sm text-gray-500">
+                              {job.reservation?.users?.[0]?.full_name || 'Unknown Customer'}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start">
+                          <MapPin className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">
+                              {job.job_type === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {job.job_type === 'delivery' 
+                                ? job.reservation?.start_zone?.[0]?.zone_name || 'Unknown Zone'
+                                : job.reservation?.end_zone?.[0]?.zone_name || 'Unknown Zone'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end space-x-2 pt-0">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">Details</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{job.job_type === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
+                            <DialogDescription>
+                              Assignment information and location details
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Location Information</h4>
+                              <div className="text-sm">
+                                <p><span className="font-medium">Start Zone:</span> {job.reservation?.start_zone?.[0]?.zone_name || 'Unknown'}</p>
+                                <p><span className="font-medium">End Zone:</span> {job.reservation?.end_zone?.[0]?.zone_name || 'Unknown'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      <Button 
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => acceptJob(job.id)}
+                      >
+                        Accept Job
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 };

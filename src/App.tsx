@@ -128,21 +128,7 @@ const AuthRoute = ({ element }: { element: React.ReactNode }) => {
   return !isAuthenticated ? <>{element}</> : null;
 };
 
-// Custom route for the dashboard, directs to role-specific dashboard
-const DashboardRouter = () => {
-  const { user } = useAuth();
-  
-  if (user?.role === 'admin') {
-    return <Navigate to="/admin" replace />;
-  }
-  
-  if (user?.role === 'liaison') {
-    return <Navigate to="/liaison" replace />;
-  }
-  
-  return <Dashboard />;
-};
-
+// Modified to allow admins to access the dashboard directly
 const AppRoutes = () => {
   return (
     <Routes>
@@ -150,7 +136,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<AuthRoute element={<Login />} />} />
       <Route path="/signup" element={<AuthRoute element={<Signup />} />} />
       <Route path="/liaison-signup" element={<AuthRoute element={<LiaisonSignup />} />} />
-      <Route path="/dashboard" element={<ProtectedRoute element={<DashboardRouter />} />} />
+      <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
       <Route path="/create-reservation" element={<ProtectedRoute element={<CreateReservation />} />} />
       <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
       <Route path="/liaison" element={<LiaisonRoute element={<LiaisonDashboard />} />} />
