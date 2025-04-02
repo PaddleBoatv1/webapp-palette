@@ -197,8 +197,12 @@ export const useLiaisonDashboard = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      // Refetch both queries to update UI
+    onSuccess: () => {
+      // Explicitly invalidate both query caches to force refetch
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      
+      // Force immediate refetch to update UI
       refetchAvailableJobs();
       refetchAssignedJobs();
       
@@ -233,6 +237,11 @@ export const useLiaisonDashboard = () => {
       return data;
     },
     onSuccess: () => {
+      // Explicitly invalidate both query caches
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
+      
+      // Force immediate refetch
       refetchAssignedJobs();
       refetchAvailableJobs();
     },
@@ -259,7 +268,11 @@ export const useLiaisonDashboard = () => {
       return data;
     },
     onSuccess: () => {
-      // Refetch to ensure all data is up to date
+      // Explicitly invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
+      
+      // Force immediate refetch
       refetchAssignedJobs();
       refetchAvailableJobs();
     },
@@ -307,6 +320,9 @@ export const useLiaisonDashboard = () => {
         if (updateError) throw updateError;
       }
       
+      // Explicitly invalidate queries and force refetch
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       refetchAssignedJobs();
       refetchAvailableJobs();
       
@@ -367,6 +383,8 @@ export const useLiaisonDashboard = () => {
       });
       
       // Force refetch to update the UI
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       refetchAssignedJobs();
       refetchAvailableJobs();
     } catch (error) {
@@ -427,6 +445,8 @@ export const useLiaisonDashboard = () => {
       });
       
       // Force refetch to update the UI
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       refetchAssignedJobs();
       refetchAvailableJobs();
     } catch (error) {
