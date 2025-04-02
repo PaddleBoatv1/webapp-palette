@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -49,7 +48,6 @@ const AdminDashboard = () => {
   const [selectedBoatId, setSelectedBoatId] = useState<string>("");
   const [activeTab, setActiveTab] = useState("reservations");
 
-  // Fetch pending reservations
   const { data: pendingReservations, isLoading: isLoadingReservations } = useQuery({
     queryKey: ['pendingReservations'],
     queryFn: async () => {
@@ -69,7 +67,6 @@ const AdminDashboard = () => {
     }
   });
 
-  // Fetch available boats
   const { data: availableBoats, isLoading: isLoadingBoats } = useQuery({
     queryKey: ['availableBoats'],
     queryFn: async () => {
@@ -83,7 +80,6 @@ const AdminDashboard = () => {
     }
   });
 
-  // Fetch zones for zone management
   const { data: zones, isLoading: isLoadingZones } = useQuery({
     queryKey: ['zones'],
     queryFn: async () => {
@@ -97,10 +93,8 @@ const AdminDashboard = () => {
     }
   });
 
-  // Mutation to assign boat and update reservation status
   const assignBoatMutation = useMutation({
     mutationFn: async ({ reservationId, boatId }: { reservationId: string, boatId: string }) => {
-      // First update the boat status
       const { error: boatError } = await supabase
         .from('boats')
         .update({ status: 'reserved' })
@@ -108,7 +102,6 @@ const AdminDashboard = () => {
         
       if (boatError) throw boatError;
       
-      // Then update the reservation
       const { data, error } = await supabase
         .from('reservations')
         .update({ 
@@ -143,14 +136,12 @@ const AdminDashboard = () => {
     }
   });
 
-  // Function to open assign boat dialog
   const handleAssignBoat = (reservation: any) => {
     setSelectedReservation(reservation);
     setSelectedBoatId("");
     setAssignBoatDialogOpen(true);
   };
 
-  // Function to submit boat assignment
   const handleConfirmAssignment = () => {
     if (!selectedReservation || !selectedBoatId) {
       toast({
@@ -167,7 +158,6 @@ const AdminDashboard = () => {
     });
   };
 
-  // Loading state
   if (isLoadingReservations || isLoadingBoats) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -336,7 +326,7 @@ const AdminDashboard = () => {
                     <TableRow key={boat.id}>
                       <TableCell>{boat.boat_name}</TableCell>
                       <TableCell>
-                        <Badge variant={boat.status === 'available' ? 'success' : 'secondary'}>
+                        <Badge variant={boat.status === 'available' ? 'secondary' : 'outline'}>
                           {boat.status}
                         </Badge>
                       </TableCell>
@@ -353,7 +343,6 @@ const AdminDashboard = () => {
         </TabsContent>
       </Tabs>
       
-      {/* Assign Boat Dialog */}
       <Dialog open={assignBoatDialogOpen} onOpenChange={setAssignBoatDialogOpen}>
         <DialogContent>
           <DialogHeader>
