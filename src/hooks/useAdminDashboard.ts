@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
@@ -111,6 +111,38 @@ export function useAdminDashboard() {
       }
       
       console.log('Fetched available boats:', data);
+      return data || [];
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // Query to fetch all liaisons for assignment
+  const { 
+    data: availableLiaisons, 
+    isLoading: isLoadingLiaisons 
+  } = useQuery({
+    queryKey: ['admin', 'availableLiaisons'],
+    queryFn: async () => {
+      console.log('Fetching available liaisons');
+      
+      const { data, error } = await supabase
+        .from('company_liaisons')
+        .select(`
+          id,
+          is_active,
+          current_job_count,
+          max_concurrent_jobs,
+          users:user_id(id, email, full_name, phone_number)
+        `)
+        .eq('is_active', true)
+        .lt('current_job_count', 3) // Only fetch liaisons who have capacity
+        .order('current_job_count', { ascending: true });
+        
+      if (error) {
+        console.error('Error fetching available liaisons:', error);
+        throw error;
+      }
+      
       return data || [];
     },
     refetchOnWindowFocus: false
@@ -258,7 +290,65 @@ export function useAdminDashboard() {
     }
   });
 
-  // Mutation to update reservation status
+  // Mutation to assign liaison to delivery job
+  const assignLiaisonMutation = useMutation({
+    mutationFn: async ({ reservationId, liaisonId }: { reservationId: string, liaisonId: string }) => {
+      console.log('Assigning liaison', liaisonId, 'to delivery job for reservation', reservationId);
+      
+      // Find the delivery job for this reservation
+      const { data: deliveryJobs, error: jobError } = await supabase
+        .from('delivery_jobs')
+        .select('id')
+        .eq('reservation_id', reservationId)
+        .eq('status', 'available')
+        .eq('job_type', 'delivery')
+        .limit(1);
+        
+      if (jobError) {
+        console.error('Error finding delivery job:', jobError);
+        throw jobError;
+      }
+      
+      if (!deliveryJobs || deliveryJobs.length === 0) {
+        throw new Error('No available delivery job found for this reservation');
+      }
+      
+      const jobId = deliveryJobs[0].id;
+      
+      // Call the database function to assign the job
+      const { data, error } = await supabase
+        .rpc('assign_delivery_job', {
+          job_id: jobId,
+          assign_to_liaison_id: liaisonId
+        });
+        
+      if (error) {
+        console.error('Error assigning liaison:', error);
+        throw error;
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'availableLiaisons'] });
+      
+      toast({
+        title: "Liaison Assigned",
+        description: "The delivery job has been assigned to the selected liaison.",
+        variant: "default"
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error assigning liaison:', error);
+      toast({
+        title: "Assignment Failed",
+        description: error.message || "There was an error assigning the liaison. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation to update reservation status (admin has access to change to any status)
   const updateReservationStatusMutation = useMutation({
     mutationFn: async ({ reservationId, newStatus }: { reservationId: string, newStatus: string }) => {
       console.log('Updating reservation', reservationId, 'status to', newStatus);
@@ -275,8 +365,6 @@ export function useAdminDashboard() {
       } else if (newStatus === 'completed') {
         updateData.end_time = new Date().toISOString();
       }
-      
-      // For awaiting_pickup status, no additional fields are needed
       
       console.log('Update data for status change:', updateData);
       
@@ -300,6 +388,8 @@ export function useAdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'pendingReservations'] });
       
       const statusMessages = {
+        'pending': 'Reservation status set to pending',
+        'confirmed': 'Reservation confirmed successfully',
         'in_progress': 'Trip started successfully',
         'awaiting_pickup': 'Boat marked for return successfully',
         'completed': 'Trip completed successfully',
@@ -327,6 +417,8 @@ export function useAdminDashboard() {
     reservations,
     pendingReservations,
     availableBoats,
+    availableLiaisons,
+    isLoadingLiaisons,
     zones,
     isLoadingZones,
     isLoadingReservations,
@@ -336,6 +428,7 @@ export function useAdminDashboard() {
     statusFilter,
     setStatusFilter,
     assignBoatMutation,
+    assignLiaisonMutation,
     updateReservationStatusMutation,
     // Add the computed statistics
     boatStats,

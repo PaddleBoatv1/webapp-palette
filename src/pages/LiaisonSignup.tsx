@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle, Info, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const LiaisonSignup = () => {
@@ -22,11 +21,17 @@ const LiaisonSignup = () => {
 
   const handleGoogleLogin = async () => {
     try {
+      if (!name || !phone || !termsAccepted) {
+        setError('Please fill in all fields and accept the terms');
+        return;
+      }
+      
       // Store the liaison registration data in localStorage so we can access it after Google auth callback
       localStorage.setItem('liaison_registration', JSON.stringify({
         name,
         phone,
-        termsAccepted
+        termsAccepted,
+        role: 'liaison'
       }));
       
       await loginWithGoogle();
@@ -91,7 +96,7 @@ const LiaisonSignup = () => {
             variant="default"
             type="button"
             className="w-full mt-4"
-            disabled={!name || !phone || !termsAccepted || isLoading || isSubmitting}
+            disabled={isLoading || isSubmitting}
             onClick={handleGoogleLogin}
           >
             <UserIcon className="mr-2 h-4 w-4" />

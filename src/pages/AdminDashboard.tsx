@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { BarChart, PieChart, LineChart, CheckCircle, AlertCircle, Clock, LogOut, Truck } from "lucide-react";
+import { BarChart, PieChart, LineChart, CheckCircle, AlertCircle, Clock, LogOut, Truck, User } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import ZoneManager from "@/components/admin/ZoneManager";
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatStatus, getStatusBadgeVariant } from '@/lib/utils';
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -23,7 +24,10 @@ const AdminDashboard = () => {
     isLoadingZones,
     pendingReservations,
     availableBoats,
+    availableLiaisons,
+    isLoadingLiaisons,
     assignBoatMutation,
+    assignLiaisonMutation,
     updateReservationStatusMutation,
     isLoadingReservations
   } = useAdminDashboard();
@@ -40,6 +44,14 @@ const AdminDashboard = () => {
 
   const assignBoat = (reservationId: string, boatId: string) => {
     assignBoatMutation.mutate({ reservationId, boatId });
+  };
+
+  const assignLiaison = (reservationId: string, liaisonId: string) => {
+    assignLiaisonMutation.mutate({ reservationId, liaisonId });
+  };
+
+  const updateStatus = (reservationId: string, newStatus: string) => {
+    updateReservationStatusMutation.mutate({ reservationId, newStatus });
   };
   
   return (
@@ -177,40 +189,81 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                         
-                        <div className="flex items-center justify-between mt-3">
-                          <div className="w-1/2 pr-2">
-                            <Select onValueChange={(value) => assignBoat(reservation.id, value)}>
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Assign a boat" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectGroup>
-                                  {availableBoats && availableBoats.length > 0 ? (
-                                    availableBoats.map((boat: any) => (
-                                      <SelectItem key={boat.id} value={boat.id}>
-                                        {boat.boat_name}
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <SelectItem value="none" disabled>No boats available</SelectItem>
-                                  )}
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
+                        <div className="flex flex-col gap-3 mt-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-1/2">
+                              <Select onValueChange={(value) => assignBoat(reservation.id, value)}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Assign a boat" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectGroup>
+                                    {availableBoats && availableBoats.length > 0 ? (
+                                      availableBoats.map((boat: any) => (
+                                        <SelectItem key={boat.id} value={boat.id}>
+                                          {boat.boat_name}
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <SelectItem value="none" disabled>No boats available</SelectItem>
+                                    )}
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="w-1/2">
+                              <Select onValueChange={(value) => updateStatus(reservation.id, value)}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Change status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectGroup>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                                    <SelectItem value="in_progress">In Progress</SelectItem>
+                                    <SelectItem value="awaiting_pickup">Awaiting Pickup</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                    <SelectItem value="canceled">Canceled</SelectItem>
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="text-red-500 border-red-300 hover:bg-red-50"
-                              onClick={() => updateReservationStatusMutation.mutate({ 
-                                reservationId: reservation.id, 
-                                newStatus: 'canceled' 
-                              })}
-                            >
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
+                          
+                          <div className="flex items-center gap-2">
+                            <div className="w-3/4">
+                              <Select onValueChange={(value) => assignLiaison(reservation.id, value)}>
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Assign to delivery executive" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectGroup>
+                                    {!isLoadingLiaisons && availableLiaisons && availableLiaisons.length > 0 ? (
+                                      availableLiaisons.map((liaison: any) => (
+                                        <SelectItem key={liaison.id} value={liaison.id}>
+                                          {liaison.users[0]?.full_name || liaison.users[0]?.email} ({liaison.current_job_count}/{liaison.max_concurrent_jobs})
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <SelectItem value="none" disabled>No liaisons available</SelectItem>
+                                    )}
+                                  </SelectGroup>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            
+                            <div className="w-1/4">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-500 w-full border-red-300 hover:bg-red-50"
+                                onClick={() => updateStatus(reservation.id, 'canceled')}
+                              >
+                                <AlertCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </Card>

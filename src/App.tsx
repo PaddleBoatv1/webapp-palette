@@ -128,7 +128,7 @@ const AuthRoute = ({ element }: { element: React.ReactNode }) => {
   return !isAuthenticated ? <>{element}</> : null;
 };
 
-// Modified to allow users with any role to access the dashboard
+// Modified routes configuration
 const AppRoutes = () => {
   const { user } = useAuth();
   
