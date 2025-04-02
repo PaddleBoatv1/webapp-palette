@@ -89,6 +89,25 @@ const AdminDashboard = () => {
     });
   };
 
+  // Helper function to safely access nested properties
+  const getUserName = (reservation: any) => {
+    if (!reservation.users) return 'Unknown';
+    const userData = Array.isArray(reservation.users) ? reservation.users[0] : reservation.users;
+    return userData?.full_name || userData?.email || 'Unknown';
+  };
+
+  const getZoneName = (zone: any) => {
+    if (!zone) return 'Not specified';
+    const zoneData = Array.isArray(zone) ? zone[0] : zone;
+    return zoneData?.zone_name || 'Not specified';
+  };
+
+  const getBoatName = (boat: any) => {
+    if (!boat) return 'Not assigned';
+    const boatData = Array.isArray(boat) ? boat[0] : boat;
+    return boatData?.boat_name || 'Not assigned';
+  };
+
   // Helper function to determine what actions are available based on current status
   const getStatusActions = (reservation: any) => {
     switch (reservation.status) {
@@ -231,11 +250,11 @@ const AdminDashboard = () => {
                         {reservations?.map((reservation) => (
                           <TableRow key={reservation.id}>
                             <TableCell>
-                              {reservation.users?.full_name || reservation.users?.email || 'Unknown'}
+                              {getUserName(reservation)}
                             </TableCell>
                             <TableCell>
-                              {reservation.start_zone?.zone_name || 'Not specified'} → {' '}
-                              {reservation.end_zone?.zone_name || 'Not specified'}
+                              {getZoneName(reservation.start_zone)} → {' '}
+                              {getZoneName(reservation.end_zone)}
                             </TableCell>
                             <TableCell>
                               {reservation.start_time ? 
@@ -243,7 +262,7 @@ const AdminDashboard = () => {
                                 'Not scheduled'}
                             </TableCell>
                             <TableCell>
-                              {reservation.boats?.boat_name || 'Not assigned'}
+                              {getBoatName(reservation.boats)}
                             </TableCell>
                             <TableCell>
                               <Badge className={getStatusBadgeVariant(reservation.status)}>
@@ -289,7 +308,7 @@ const AdminDashboard = () => {
                               <TableHead>Customer</TableHead>
                               <TableHead>Start Zone</TableHead>
                               <TableHead>End Zone</TableHead>
-                              <TableHead>Start Time</TableHead>
+                              <TableHead>Created</TableHead>
                               <TableHead>Actions</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -297,18 +316,18 @@ const AdminDashboard = () => {
                             {pendingReservations?.map((reservation) => (
                               <TableRow key={reservation.id}>
                                 <TableCell>
-                                  {reservation.users?.full_name || reservation.users?.email || 'Unknown'}
+                                  {getUserName(reservation)}
                                 </TableCell>
                                 <TableCell>
-                                  {reservation.start_zone?.zone_name || 'Not specified'}
+                                  {getZoneName(reservation.start_zone)}
                                 </TableCell>
                                 <TableCell>
-                                  {reservation.end_zone?.zone_name || 'Not specified'}
+                                  {getZoneName(reservation.end_zone)}
                                 </TableCell>
                                 <TableCell>
-                                  {reservation.start_time ? 
-                                    format(new Date(reservation.start_time), 'PPp') : 
-                                    'Not scheduled'}
+                                  {reservation.created_at ? 
+                                    format(new Date(reservation.created_at), 'PPp') : 
+                                    'Unknown'}
                                 </TableCell>
                                 <TableCell>
                                   <Button 
@@ -433,17 +452,15 @@ const AdminDashboard = () => {
             <div className="space-y-2">
               <p className="text-sm font-medium">Customer:</p>
               <p className="text-sm">
-                {selectedReservation?.users?.full_name || 
-                 selectedReservation?.users?.email || 
-                 'Unknown'}
+                {selectedReservation ? getUserName(selectedReservation) : 'Unknown'}
               </p>
             </div>
             
             <div className="space-y-2">
               <p className="text-sm font-medium">Route:</p>
               <p className="text-sm">
-                {selectedReservation?.start_zone?.zone_name || 'Not specified'} → {' '}
-                {selectedReservation?.end_zone?.zone_name || 'Not specified'}
+                {selectedReservation ? getZoneName(selectedReservation.start_zone) : 'Not specified'} → {' '}
+                {selectedReservation ? getZoneName(selectedReservation.end_zone) : 'Not specified'}
               </p>
             </div>
             
