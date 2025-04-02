@@ -215,9 +215,11 @@ export function useAdminDashboard() {
     // Find the most popular zone based on reservation count
     let zoneCounts: Record<string, number> = {};
     reservations?.forEach(res => {
-      const startZoneId = res.start_zone?.[0]?.id;
-      if (startZoneId) {
-        zoneCounts[startZoneId] = (zoneCounts[startZoneId] || 0) + 1;
+      if (res.start_zone && res.start_zone.length > 0) {
+        const startZoneId = res.start_zone[0].id;
+        if (startZoneId) {
+          zoneCounts[startZoneId] = (zoneCounts[startZoneId] || 0) + 1;
+        }
       }
     });
     
@@ -319,7 +321,7 @@ export function useAdminDashboard() {
       const { error: liaisonError } = await supabase
         .from('company_liaisons')
         .update({ 
-          current_job_count: supabase.rpc('greatest', { a: 0, b: 1 })
+          current_job_count: 1 // Increment by 1 for new job
         })
         .eq('id', liaisonId);
         
@@ -492,6 +494,28 @@ export function useAdminDashboard() {
         description: "There was an error updating the boat status. Please try again.",
         variant: "destructive"
       });
+    }
+  });
+
+  // Mutation to update liaison job count
+  const updateLiaisonJobCountMutation = useMutation({
+    mutationFn: async ({ liaisonId }: { liaisonId: string }) => {
+      console.log('Updating liaison job count for:', liaisonId);
+      
+      const { data, error } = await supabase
+        .from('company_liaisons')
+        .update({ 
+          current_job_count: 1 // Increment by 1 for new job
+        })
+        .eq('id', liaisonId)
+        .select();
+        
+      if (error) {
+        console.error('Error updating liaison job count:', error);
+        throw error;
+      }
+      
+      return data;
     }
   });
 

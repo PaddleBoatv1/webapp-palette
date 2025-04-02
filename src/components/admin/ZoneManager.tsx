@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -145,7 +144,7 @@ const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
   
   // Create Zone Mutation
   const createZone = useMutation({
-    mutationFn: async (zone: Partial<Zone>) => {
+    mutationFn: async (zone: { zone_name: string; is_premium: boolean; description: string | null; coordinates: { lat: number; lng: number } }) => {
       const { data, error } = await supabase
         .from('zones')
         .insert([zone])
