@@ -4,16 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { Database } from '@/integrations/supabase/types';
 
-// Define types for clarity
+// Define refined types based on actual Supabase return types
 interface LiaisonProfile {
   id: string;
   user_id: string;
   is_active: boolean;
-  current_location?: {
-    lat: number;
-    lng: number;
-  };
+  current_location?: { lat: number; lng: number } | null;
   current_job_count: number;
   max_concurrent_jobs: number;
 }
@@ -21,8 +19,8 @@ interface LiaisonProfile {
 interface User {
   id: string;
   email: string;
-  full_name?: string;
-  phone_number?: string;
+  full_name?: string | null;
+  phone_number?: string | null;
 }
 
 interface Zone {
@@ -35,11 +33,11 @@ interface Reservation {
   id: string;
   user_id: string;
   status: string;
-  start_zone_id?: string;
-  end_zone_id?: string;
-  user?: User;
-  start_zone?: Zone;
-  end_zone?: Zone;
+  start_zone_id?: string | null;
+  end_zone_id?: string | null;
+  user?: User | null;
+  start_zone?: Zone | null;
+  end_zone?: Zone | null;
 }
 
 interface DeliveryJob {
@@ -47,10 +45,10 @@ interface DeliveryJob {
   reservation_id: string;
   status: string;
   job_type: string;
-  liaison_id?: string;
-  assigned_at?: string;
-  completed_at?: string;
-  reservation?: Reservation;
+  liaison_id?: string | null;
+  assigned_at?: string | null;
+  completed_at?: string | null;
+  reservation?: Reservation | null;
 }
 
 // Interface for formatted job data
@@ -72,6 +70,12 @@ interface FormattedJob {
   endZoneCoordinates: any;
   reservationId: string;
   reservationStatus: string;
+}
+
+// Type for the response from assign_delivery_job RPC function
+interface AssignJobResponse {
+  success: boolean;
+  message: string;
 }
 
 export const useLiaisonDashboard = () => {
@@ -96,7 +100,8 @@ export const useLiaisonDashboard = () => {
         throw error;
       }
 
-      return data as LiaisonProfile;
+      // Cast to the correct type
+      return data as unknown as LiaisonProfile;
     },
     enabled: !!user?.id,
   });
@@ -143,7 +148,8 @@ export const useLiaisonDashboard = () => {
       }
 
       console.log('Available jobs fetched:', data.length);
-      return data as DeliveryJob[];
+      // Cast to correct type - the actual data structure matches our DeliveryJob interface
+      return data as unknown as DeliveryJob[];
     },
     enabled: !!liaisonProfile,
   });
@@ -191,7 +197,8 @@ export const useLiaisonDashboard = () => {
       }
 
       console.log('Assigned jobs fetched:', data.length);
-      return data as DeliveryJob[];
+      // Cast to correct type
+      return data as unknown as DeliveryJob[];
     },
     enabled: !!liaisonProfile?.id,
   });
@@ -239,11 +246,14 @@ export const useLiaisonDashboard = () => {
         throw new Error(error.message || 'Failed to update job');
       }
 
-      if (!data.success) {
-        throw new Error(data.message || 'Could not assign job');
+      // Handle the response, which is a JSON object with success and message fields
+      const response = data as unknown as AssignJobResponse;
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Could not assign job');
       }
 
-      return data;
+      return response;
     },
     onSuccess: (_, jobId) => {
       // Update queries
