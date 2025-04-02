@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -292,6 +291,64 @@ export function useAdminDashboard() {
     }
   });
 
+  // Mutation to assign liaison to reservation/create delivery job
+  const assignLiaisonMutation = useMutation({
+    mutationFn: async ({ reservationId, liaisonId }: { reservationId: string, liaisonId: string }) => {
+      console.log('Assigning liaison', liaisonId, 'to reservation', reservationId);
+      
+      // Create a delivery job for the reservation
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .insert([
+          {
+            reservation_id: reservationId,
+            liaison_id: liaisonId,
+            status: 'assigned',
+            job_type: 'delivery',
+            assigned_at: new Date().toISOString()
+          }
+        ])
+        .select();
+        
+      if (error) {
+        console.error('Error creating delivery job:', error);
+        throw error;
+      }
+      
+      // Update the liaison's job count
+      const { error: liaisonError } = await supabase
+        .from('company_liaisons')
+        .update({ 
+          current_job_count: supabase.rpc('greatest', { a: 0, b: 1 })
+        })
+        .eq('id', liaisonId);
+        
+      if (liaisonError) {
+        console.error('Error updating liaison job count:', liaisonError);
+        throw liaisonError;
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      // Refetch relevant queries to update UI
+      refetchReservations();
+      
+      toast({
+        title: "Liaison Assigned",
+        description: "A delivery executive has been assigned to handle this reservation."
+      });
+    },
+    onError: (error) => {
+      console.error('Error assigning liaison:', error);
+      toast({
+        title: "Assignment Failed",
+        description: "There was an error assigning the delivery executive. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
   // Mutation to update reservation status (admin has access to change to any status)
   const updateReservationStatusMutation = useMutation({
     mutationFn: async ({ reservationId, newStatus }: { reservationId: string, newStatus: string }) => {
@@ -454,6 +511,7 @@ export function useAdminDashboard() {
     statusFilter,
     setStatusFilter,
     assignBoatMutation,
+    assignLiaisonMutation,
     updateReservationStatusMutation,
     addBoatMutation,
     updateBoatStatusMutation,
