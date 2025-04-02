@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { User, Boat, Reservation, Payment, Zone, Waiver, WaiverAcceptance } from '@/lib/supabase';
@@ -12,14 +11,15 @@ export const useGetCurrentUser = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-        
-      if (error) throw error;
-      return data as User;
+      // Instead of directly querying the users table, get user profile info
+      // from the auth metadata
+      return {
+        id: user.id,
+        email: user.email,
+        role: user.user_metadata?.role || 'customer',
+        full_name: user.user_metadata?.full_name,
+        phone_number: user.user_metadata?.phone_number
+      } as User;
     }
   });
 };

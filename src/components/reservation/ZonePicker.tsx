@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Zone } from "@/lib/supabase";
 import { MapPin, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { geoJSONToLatLng } from "@/lib/googleMapsUtils";
+import { geoJSONToLatLng, calculateETA } from "@/lib/googleMapsUtils";
 
 // Add your Google Maps API key
 const GOOGLE_MAPS_API_KEY = "AIzaSyAEohpaXRaceIHcyWwsRuTGemtEH-IRnkc";
@@ -24,6 +24,7 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
   const [selectedStartZone, setSelectedStartZone] = useState<Zone | null>(null);
   const [selectedEndZone, setSelectedEndZone] = useState<Zone | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [eta, setEta] = useState<number | null>(null);
 
   // Load Google Maps API with necessary libraries
   useEffect(() => {
@@ -35,7 +36,11 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
       script.onload = () => setMapLoaded(true);
       document.head.appendChild(script);
       return () => {
-        document.head.removeChild(script);
+        // Clean up the script if the component unmounts before the script loads
+        const existingScript = document.querySelector(`script[src*="maps.googleapis.com"]`);
+        if (existingScript && existingScript.parentNode) {
+          existingScript.parentNode.removeChild(existingScript);
+        }
       };
     } else {
       setMapLoaded(true);
@@ -134,14 +139,11 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
       if (!zone.coordinates) return;
       
       try {
-        const coordinates = typeof zone.coordinates === 'string' 
-          ? JSON.parse(zone.coordinates) 
-          : zone.coordinates;
-          
-        if (!coordinates.lat || !coordinates.lng) return;
+        const coordinates = geoJSONToLatLng(zone.coordinates);
+        if (!coordinates) return;
         
         const marker = new window.google.maps.Marker({
-          position: { lat: coordinates.lat, lng: coordinates.lng },
+          position: coordinates,
           map,
           title: zone.zone_name,
           label: zone.is_premium ? "P" : undefined,
@@ -198,6 +200,19 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
         });
       }
     });
+
+    // Calculate ETA if both zones are selected
+    if (selectedStartZone && selectedEndZone && selectedStartZone.coordinates && selectedEndZone.coordinates) {
+      const startCoords = geoJSONToLatLng(selectedStartZone.coordinates);
+      const endCoords = geoJSONToLatLng(selectedEndZone.coordinates);
+      
+      if (startCoords && endCoords) {
+        const estimatedEta = calculateETA(startCoords, endCoords);
+        setEta(estimatedEta);
+      }
+    } else {
+      setEta(null);
+    }
   }, [selectedStartZone, selectedEndZone, markers, zones]);
 
   const handleZoneClick = useCallback((zone: Zone) => {
@@ -281,6 +296,12 @@ const ZonePicker = ({ zones, onSelect }: ZonePickerProps) => {
                       : "Select destination on map"}
                   </span>
                 </div>
+
+                {eta !== null && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                    <p className="text-sm font-medium">Estimated paddle time: {eta} minutes</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

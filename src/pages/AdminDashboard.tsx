@@ -27,11 +27,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, CalendarClock, Ship } from "lucide-react";
+import { Loader2, Plus, CalendarClock, Ship, MapPin, LayoutDashboard } from "lucide-react";
 import { format } from "date-fns";
+import ZoneManager from "@/components/admin/ZoneManager";
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -40,6 +47,7 @@ const AdminDashboard = () => {
   const [assignBoatDialogOpen, setAssignBoatDialogOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
   const [selectedBoatId, setSelectedBoatId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("reservations");
 
   // Fetch pending reservations
   const { data: pendingReservations, isLoading: isLoadingReservations } = useQuery({
@@ -69,6 +77,20 @@ const AdminDashboard = () => {
         .from('boats')
         .select('*')
         .eq('status', 'available');
+        
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch zones for zone management
+  const { data: zones, isLoading: isLoadingZones } = useQuery({
+    queryKey: ['zones'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('zones')
+        .select('*')
+        .order('created_at', { ascending: false });
         
       if (error) throw error;
       return data;
@@ -145,22 +167,7 @@ const AdminDashboard = () => {
     });
   };
 
-  // Admin zone management functionality
-  const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
-  const [newZone, setNewZone] = useState({
-    zone_name: '',
-    is_premium: false,
-    description: '',
-    coordinates: { lat: 0, lng: 0 }
-  });
-
-  // Function to handle zone creation
-  const handleAddZone = async () => {
-    // Implementation for adding new zones would go here
-    // This would connect to your Supabase database to add a new zone
-    setShowAddZoneDialog(false);
-  };
-
+  // Loading state
   if (isLoadingReservations || isLoadingBoats) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
@@ -176,128 +183,175 @@ const AdminDashboard = () => {
         <p className="text-gray-500">Manage reservations, boats, and zones</p>
       </header>
       
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8">
-        <div className="md:col-span-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Pending Reservations</span>
-                <Badge variant="outline" className="ml-2">
-                  {pendingReservations?.length || 0}
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Review and assign boats to pending reservations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pendingReservations?.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No pending reservations at this time
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Start Zone</TableHead>
-                        <TableHead>End Zone</TableHead>
-                        <TableHead>Start Time</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingReservations?.map((reservation) => (
-                        <TableRow key={reservation.id}>
-                          <TableCell>
-                            {reservation.users?.full_name || reservation.users?.email || 'Unknown'}
-                          </TableCell>
-                          <TableCell>
-                            {reservation.start_zone?.zone_name || 'Not specified'}
-                          </TableCell>
-                          <TableCell>
-                            {reservation.end_zone?.zone_name || 'Not specified'}
-                          </TableCell>
-                          <TableCell>
-                            {reservation.start_time ? 
-                              format(new Date(reservation.start_time), 'PPp') : 
-                              'Not scheduled'}
-                          </TableCell>
-                          <TableCell>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleAssignBoat(reservation)}
-                              disabled={!availableBoats || availableBoats.length === 0}
-                            >
-                              Assign Boat
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <Tabs defaultValue="reservations" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="reservations" className="flex items-center">
+            <LayoutDashboard className="mr-2 h-4 w-4" />
+            <span>Reservations</span>
+          </TabsTrigger>
+          <TabsTrigger value="zones" className="flex items-center">
+            <MapPin className="mr-2 h-4 w-4" />
+            <span>Manage Zones</span>
+          </TabsTrigger>
+          <TabsTrigger value="boats" className="flex items-center">
+            <Ship className="mr-2 h-4 w-4" />
+            <span>Boats</span>
+          </TabsTrigger>
+        </TabsList>
         
-        <div className="md:col-span-4">
+        <TabsContent value="reservations">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div className="md:col-span-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Pending Reservations</span>
+                    <Badge variant="outline" className="ml-2">
+                      {pendingReservations?.length || 0}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Review and assign boats to pending reservations
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pendingReservations?.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      No pending reservations at this time
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Start Zone</TableHead>
+                            <TableHead>End Zone</TableHead>
+                            <TableHead>Start Time</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {pendingReservations?.map((reservation) => (
+                            <TableRow key={reservation.id}>
+                              <TableCell>
+                                {reservation.users?.full_name || reservation.users?.email || 'Unknown'}
+                              </TableCell>
+                              <TableCell>
+                                {reservation.start_zone?.zone_name || 'Not specified'}
+                              </TableCell>
+                              <TableCell>
+                                {reservation.end_zone?.zone_name || 'Not specified'}
+                              </TableCell>
+                              <TableCell>
+                                {reservation.start_time ? 
+                                  format(new Date(reservation.start_time), 'PPp') : 
+                                  'Not scheduled'}
+                              </TableCell>
+                              <TableCell>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleAssignBoat(reservation)}
+                                  disabled={!availableBoats || availableBoats.length === 0}
+                                >
+                                  Assign Boat
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="md:col-span-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Ship className="h-5 w-5 mr-2" />
+                    <span>Available Boats</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Boats ready for assignment
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {availableBoats?.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">
+                      No boats available
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableBoats?.map((boat) => (
+                        <div 
+                          key={boat.id} 
+                          className="p-3 border rounded-md flex justify-between items-center"
+                        >
+                          <span>{boat.boat_name}</span>
+                          <Badge variant="outline">Available</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="zones">
+          <ZoneManager zones={zones || []} isLoading={isLoadingZones} />
+        </TabsContent>
+        
+        <TabsContent value="boats">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <Ship className="h-5 w-5 mr-2" />
-                <span>Available Boats</span>
-              </CardTitle>
+              <CardTitle>Boat Management</CardTitle>
               <CardDescription>
-                Boats ready for assignment
+                View and manage your paddleboat inventory
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {availableBoats?.length === 0 ? (
-                <div className="text-center py-4 text-gray-500">
-                  No boats available
-                </div>
-              ) : (
-                <div className="space-y-2">
+              <div className="mb-4">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Boat
+                </Button>
+              </div>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Boat Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>GPS Device ID</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {availableBoats?.map((boat) => (
-                    <div 
-                      key={boat.id} 
-                      className="p-3 border rounded-md flex justify-between items-center"
-                    >
-                      <span>{boat.boat_name}</span>
-                      <Badge variant="outline">Available</Badge>
-                    </div>
+                    <TableRow key={boat.id}>
+                      <TableCell>{boat.boat_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={boat.status === 'available' ? 'success' : 'secondary'}>
+                          {boat.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{boat.gps_device_id || 'Not assigned'}</TableCell>
+                      <TableCell>
+                        <Button variant="outline" size="sm">Edit</Button>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </div>
-              )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
-          
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <CalendarClock className="h-5 w-5 mr-2" />
-                <span>Zone Management</span>
-              </CardTitle>
-              <CardDescription>
-                Add or edit pickup/dropoff zones
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => setShowAddZoneDialog(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add New Zone
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
       
       {/* Assign Boat Dialog */}
       <Dialog open={assignBoatDialogOpen} onOpenChange={setAssignBoatDialogOpen}>
@@ -363,31 +417,6 @@ const AdminDashboard = () => {
               ) : (
                 'Confirm Assignment'
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Zone Dialog */}
-      <Dialog open={showAddZoneDialog} onOpenChange={setShowAddZoneDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Zone</DialogTitle>
-            <DialogDescription>
-              Create a new pickup/dropoff zone for paddleboats.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Zone creation form would go here */}
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAddZoneDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAddZone}>
-              Add Zone
             </Button>
           </DialogFooter>
         </DialogContent>
