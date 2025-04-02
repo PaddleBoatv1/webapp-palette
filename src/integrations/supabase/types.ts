@@ -514,6 +514,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      increment_count: {
+        Args: {
+          row_id: string
+        }
+        Returns: number
+      }
       is_admin: {
         Args: {
           user_id: string
