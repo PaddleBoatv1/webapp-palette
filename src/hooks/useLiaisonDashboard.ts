@@ -62,6 +62,7 @@ export const useLiaisonDashboard = () => {
       
       if (data) {
         setLiaisonId(data.id);
+        console.log("Liaison ID set:", data.id);
       }
     };
     
@@ -72,6 +73,7 @@ export const useLiaisonDashboard = () => {
   const { data: availableJobsData, isLoading: isAvailableLoading, refetch: refetchAvailableJobs } = useQuery({
     queryKey: ['availableJobs'],
     queryFn: async () => {
+      console.log("Fetching available jobs...");
       const { data, error } = await supabase
         .from('delivery_jobs')
         .select(`
@@ -108,6 +110,8 @@ export const useLiaisonDashboard = () => {
         throw error;
       }
       
+      console.log("Available jobs fetched:", data.length);
+      
       // Process the data to ensure all jobs have properly formatted objects
       return data.map((job: any) => ({
         ...job,
@@ -128,6 +132,7 @@ export const useLiaisonDashboard = () => {
     queryFn: async () => {
       if (!liaisonId) return [];
       
+      console.log("Fetching assigned jobs for liaison:", liaisonId);
       const { data, error } = await supabase
         .from('delivery_jobs')
         .select(`
@@ -168,6 +173,8 @@ export const useLiaisonDashboard = () => {
         throw error;
       }
       
+      console.log("Assigned jobs fetched:", data.length);
+      
       // Process the data to ensure all jobs have properly formatted objects
       return data.map((job: any) => ({
         ...job,
@@ -187,24 +194,57 @@ export const useLiaisonDashboard = () => {
     mutationFn: async (jobId: string) => {
       if (!liaisonId) throw new Error('Liaison ID not found');
       
-      // Call the database function to assign the job atomically
+      console.log(`Accepting job ${jobId} for liaison ${liaisonId}`);
+      
+      // First update the job directly instead of using the database function
       const { data, error } = await supabase
-        .rpc('assign_delivery_job', {
-          job_id: jobId,
-          assign_to_liaison_id: liaisonId
-        });
+        .from('delivery_jobs')
+        .update({ 
+          liaison_id: liaisonId,
+          status: 'assigned',
+          assigned_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('status', 'available') // Make sure it's still available
+        .select();
         
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error accepting job:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        throw new Error('Job no longer available');
+      }
+      
+      // Update the liaison's job count separately
+      const { error: updateError } = await supabase
+        .from('company_liaisons')
+        .update({ 
+          current_job_count: supabase.rpc('greatest', { a: 0, b: 1 })
+        })
+        .eq('id', liaisonId);
+        
+      if (updateError) {
+        console.error('Error updating liaison job count:', updateError);
+        // Not throwing here to ensure UI updates even if job count fails
+      }
+      
+      console.log('Job accepted successfully');
+      return data[0];
     },
     onSuccess: () => {
+      console.log('Invalidating and refetching queries after accepting job');
       // Explicitly invalidate both query caches to force refetch
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
       
       // Force immediate refetch to update UI
-      refetchAvailableJobs();
-      refetchAssignedJobs();
+      setTimeout(() => {
+        refetchAvailableJobs();
+        refetchAssignedJobs();
+      }, 100);
       
       toast({
         title: 'Job Accepted',
@@ -212,6 +252,7 @@ export const useLiaisonDashboard = () => {
       });
     },
     onError: (error: any) => {
+      console.error('Error in acceptJobMutation:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to accept job',
@@ -223,6 +264,7 @@ export const useLiaisonDashboard = () => {
   // Mutation to update job status
   const updateJobStatusMutation = useMutation({
     mutationFn: async ({ jobId, status }: { jobId: string; status: string }) => {
+      console.log(`Updating job ${jobId} status to ${status}`);
       const { data, error } = await supabase
         .from('delivery_jobs')
         .update({ 
@@ -233,19 +275,28 @@ export const useLiaisonDashboard = () => {
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating job status:', error);
+        throw error;
+      }
+      
+      console.log('Job status updated successfully');
       return data;
     },
     onSuccess: () => {
+      console.log('Invalidating and refetching queries after updating job status');
       // Explicitly invalidate both query caches
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       
       // Force immediate refetch
-      refetchAssignedJobs();
-      refetchAvailableJobs();
+      setTimeout(() => {
+        refetchAssignedJobs();
+        refetchAvailableJobs();
+      }, 100);
     },
     onError: (error: any) => {
+      console.error('Error in updateJobStatusMutation:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update job status',
@@ -257,6 +308,7 @@ export const useLiaisonDashboard = () => {
   // Mutation to update reservation status
   const updateReservationStatusMutation = useMutation({
     mutationFn: async ({ reservationId, status }: { reservationId: string; status: string }) => {
+      console.log(`Updating reservation ${reservationId} status to ${status}`);
       const { data, error } = await supabase
         .from('reservations')
         .update({ status })
@@ -264,19 +316,28 @@ export const useLiaisonDashboard = () => {
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating reservation status:', error);
+        throw error;
+      }
+      
+      console.log('Reservation status updated successfully');
       return data;
     },
     onSuccess: () => {
+      console.log('Invalidating and refetching queries after updating reservation status');
       // Explicitly invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       
       // Force immediate refetch
-      refetchAssignedJobs();
-      refetchAvailableJobs();
+      setTimeout(() => {
+        refetchAssignedJobs();
+        refetchAvailableJobs();
+      }, 100);
     },
     onError: (error: any) => {
+      console.error('Error in updateReservationStatusMutation:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update reservation status',
@@ -288,6 +349,7 @@ export const useLiaisonDashboard = () => {
   // Function to resign a job
   const resignJob = async (jobId: string) => {
     try {
+      console.log(`Resigning job ${jobId}`);
       // Get the job details first
       const { data: jobData, error: jobError } = await supabase
         .from('delivery_jobs')
@@ -295,7 +357,10 @@ export const useLiaisonDashboard = () => {
         .eq('id', jobId)
         .single();
         
-      if (jobError) throw jobError;
+      if (jobError) {
+        console.error('Error getting job details:', jobError);
+        throw jobError;
+      }
       
       // Update the job status to available and remove liaison assignment
       const { error } = await supabase
@@ -306,7 +371,10 @@ export const useLiaisonDashboard = () => {
         })
         .eq('id', jobId);
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating job status:', error);
+        throw error;
+      }
       
       // Update the liaison's job count
       if (liaisonId) {
@@ -317,20 +385,29 @@ export const useLiaisonDashboard = () => {
           })
           .eq('id', liaisonId);
           
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Error updating liaison job count:', updateError);
+          throw updateError;
+        }
       }
+      
+      console.log('Job resigned successfully');
       
       // Explicitly invalidate queries and force refetch
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
-      refetchAssignedJobs();
-      refetchAvailableJobs();
+      
+      setTimeout(() => {
+        refetchAssignedJobs();
+        refetchAvailableJobs();
+      }, 100);
       
       toast({
         title: 'Job Resigned',
         description: 'You have resigned from this job',
       });
     } catch (error: any) {
+      console.error('Error in resignJob:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to resign job',
@@ -341,12 +418,14 @@ export const useLiaisonDashboard = () => {
 
   // Function to accept a job
   const acceptJob = (jobId: string) => {
+    console.log(`Accepting job: ${jobId}`);
     acceptJobMutation.mutate(jobId);
   };
 
   // Function to start delivery
   const startDelivery = async (jobId: string) => {
     try {
+      console.log(`Starting delivery for job ${jobId}`);
       await updateJobStatusMutation.mutateAsync({ jobId, status: 'in_progress' });
       toast({
         title: 'Delivery Started',
@@ -360,13 +439,17 @@ export const useLiaisonDashboard = () => {
   // Function to complete delivery (Liaison delivers the boat to customer)
   const completeDelivery = async (jobId: string) => {
     try {
+      console.log(`Completing delivery for job ${jobId}`);
       const { data: jobData } = await supabase
         .from('delivery_jobs')
         .select('reservation_id')
         .eq('id', jobId)
         .single();
         
-      if (!jobData) throw new Error('Job not found');
+      if (!jobData) {
+        console.error('Job not found');
+        throw new Error('Job not found');
+      }
       
       // Update job status
       await updateJobStatusMutation.mutateAsync({ jobId, status: 'completed' });
@@ -385,8 +468,11 @@ export const useLiaisonDashboard = () => {
       // Force refetch to update the UI
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
-      refetchAssignedJobs();
-      refetchAvailableJobs();
+      
+      setTimeout(() => {
+        refetchAssignedJobs();
+        refetchAvailableJobs();
+      }, 100);
     } catch (error) {
       console.error('Error completing delivery:', error);
     }
@@ -395,6 +481,7 @@ export const useLiaisonDashboard = () => {
   // Function to start pickup
   const startPickup = async (jobId: string) => {
     try {
+      console.log(`Starting pickup for job ${jobId}`);
       await updateJobStatusMutation.mutateAsync({ jobId, status: 'in_progress' });
       toast({
         title: 'Pickup Started',
@@ -408,13 +495,17 @@ export const useLiaisonDashboard = () => {
   // Function to complete pickup (Liaison retrieves the boat after customer finishes)
   const completePickup = async (jobId: string) => {
     try {
+      console.log(`Completing pickup for job ${jobId}`);
       const { data: jobData } = await supabase
         .from('delivery_jobs')
         .select('reservation_id')
         .eq('id', jobId)
         .single();
         
-      if (!jobData) throw new Error('Job not found');
+      if (!jobData) {
+        console.error('Job not found');
+        throw new Error('Job not found');
+      }
       
       // Update job status
       await updateJobStatusMutation.mutateAsync({ jobId, status: 'completed' });
@@ -447,8 +538,11 @@ export const useLiaisonDashboard = () => {
       // Force refetch to update the UI
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
-      refetchAssignedJobs();
-      refetchAvailableJobs();
+      
+      setTimeout(() => {
+        refetchAssignedJobs();
+        refetchAvailableJobs();
+      }, 100);
     } catch (error) {
       console.error('Error completing pickup:', error);
     }
