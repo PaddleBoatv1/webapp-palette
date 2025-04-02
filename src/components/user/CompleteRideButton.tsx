@@ -20,10 +20,27 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
         .update({ status: 'awaiting_pickup' })
         .eq('id', reservationId);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating reservation status:", error);
+        throw new Error(error.message || "Failed to complete ride");
+      }
       
-      // This will trigger the database function that creates a pickup job 
-      // via the create_delivery_job_on_reservation_confirm trigger
+      // Instead of relying on the database trigger to create the pickup job,
+      // we'll explicitly create it here to avoid RLS policy issues
+      const { error: jobError } = await supabase
+        .from('delivery_jobs')
+        .insert([
+          { 
+            reservation_id: reservationId, 
+            job_type: 'pickup', 
+            status: 'available'
+          }
+        ]);
+      
+      if (jobError) {
+        console.error("Error creating pickup job:", jobError);
+        throw new Error(jobError.message || "Failed to request pickup");
+      }
       
       return { success: true };
     },
