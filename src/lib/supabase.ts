@@ -12,9 +12,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true
   },
   global: {
-    fetch: (...args) => {
-      console.log('Supabase fetch request:', args[0]);
-      return fetch(...args);
+    fetch: (url, options) => {
+      console.log('Supabase fetch request:', url);
+      return fetch(url, options);
     }
   }
 });
