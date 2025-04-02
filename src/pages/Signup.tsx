@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { User, AlertCircle, Info } from "lucide-react";
+import { User as UserIcon, AlertCircle, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -44,7 +44,7 @@ const Signup = () => {
             onClick={handleGoogleLogin}
             disabled={isLoading}
           >
-            <User className="mr-2 h-4 w-4" />
+            <UserIcon className="mr-2 h-4 w-4" />
             Sign up with Google
           </Button>
           

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { User, AlertCircle, Info, RefreshCw } from "lucide-react";
+import { AlertCircle, Info, RefreshCw, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -25,14 +25,10 @@ const Login = () => {
     setClearingSession(true);
     try {
       await clearAllAuthData();
-      
-      // Force page reload after clearing
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1000);
+      setClearingSession(false);
+      // No need to use window.location.href as it causes full page reloads
     } catch (error) {
       console.error("Error during force clear:", error);
-    } finally {
       setClearingSession(false);
     }
   };
@@ -61,7 +57,7 @@ const Login = () => {
             onClick={handleGoogleLogin}
             disabled={isLoading || clearingSession}
           >
-            <User className="mr-2 h-4 w-4" />
+            <UserIcon className="mr-2 h-4 w-4" />
             {isLoading ? "Please wait..." : "Sign in with Google"}
           </Button>
           

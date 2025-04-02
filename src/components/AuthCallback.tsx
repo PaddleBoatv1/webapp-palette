@@ -26,7 +26,7 @@ const AuthCallback: React.FC = () => {
       
       // Return to login page
       setTimeout(() => {
-        window.location.href = '/login';
+        navigate('/login');
       }, 1500);
       
       setProcessing(false);
@@ -86,9 +86,9 @@ const AuthCallback: React.FC = () => {
             
             // Redirect based on role
             if (userData?.role === 'admin') {
-              window.location.href = '/admin';
+              navigate('/admin', { replace: true });
             } else {
-              window.location.href = '/dashboard';
+              navigate('/dashboard', { replace: true });
             }
             return;
           }
@@ -123,9 +123,9 @@ const AuthCallback: React.FC = () => {
           
           // Redirect based on role
           if (userData?.role === 'admin') {
-            window.location.href = '/admin';
+            navigate('/admin', { replace: true });
           } else {
-            window.location.href = '/dashboard';
+            navigate('/dashboard', { replace: true });
           }
           return;
         }
@@ -147,7 +147,7 @@ const AuthCallback: React.FC = () => {
         
         // Redirect to login
         setTimeout(() => {
-          window.location.href = '/login';
+          navigate('/login');
         }, 1500);
       } finally {
         setProcessing(false);
@@ -185,7 +185,7 @@ const AuthCallback: React.FC = () => {
         <button 
           onClick={() => {
             sessionStorage.removeItem('auth_hash');
-            window.location.href = '/login';
+            navigate('/login');
           }} 
           className="ml-1 text-blue-500 hover:underline"
         >

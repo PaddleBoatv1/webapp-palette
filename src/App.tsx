@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -22,12 +22,14 @@ const queryClient = new QueryClient();
 const ProtectedRoute = ({ element }: { element: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate('/login');
+      console.log("Not authenticated, redirecting to login from:", location.pathname);
+      navigate('/login', { replace: true });
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, location]);
   
   if (isLoading) {
     return (
@@ -44,12 +46,19 @@ const ProtectedRoute = ({ element }: { element: React.ReactNode }) => {
 const AdminRoute = ({ element }: { element: React.ReactNode }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== 'admin')) {
-      navigate('/dashboard');
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        console.log("Not authenticated, redirecting to login from admin route:", location.pathname);
+        navigate('/login', { replace: true });
+      } else if (user?.role !== 'admin') {
+        console.log("Not admin, redirecting to dashboard from:", location.pathname);
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [isAuthenticated, isLoading, navigate, user]);
+  }, [isAuthenticated, isLoading, navigate, user, location]);
   
   if (isLoading) {
     return (
@@ -64,7 +73,19 @@ const AdminRoute = ({ element }: { element: React.ReactNode }) => {
 
 // Auth routes - redirect to dashboard if already logged in
 const AuthRoute = ({ element }: { element: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      console.log("Already authenticated, redirecting based on role");
+      if (user?.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [isAuthenticated, isLoading, navigate, user]);
   
   if (isLoading) {
     return (
@@ -74,7 +95,7 @@ const AuthRoute = ({ element }: { element: React.ReactNode }) => {
     );
   }
   
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{element}</>;
+  return !isAuthenticated ? <>{element}</> : null;
 };
 
 const AppRoutes = () => {
