@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -206,6 +206,27 @@ export const useLiaisonDashboard = () => {
       console.log(`Accepting job: ${jobId}`);
       console.log(`Accepting job ${jobId} for liaison ${liaisonProfile.id}`);
 
+      // Check job status before attempting to assign
+      const { data: jobData, error: jobError } = await supabase
+        .from('delivery_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single();
+
+      if (jobError) {
+        console.error('Error fetching job details:', jobError);
+        throw new Error('Job not found');
+      }
+
+      if (jobData.status !== 'available') {
+        throw new Error('This job is no longer available');
+      }
+
+      // Check liaison capacity
+      if (liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs) {
+        throw new Error('You have reached your maximum job capacity');
+      }
+
       // Use the database function to safely assign the job
       const { data, error } = await supabase
         .rpc('assign_delivery_job', {
@@ -215,11 +236,11 @@ export const useLiaisonDashboard = () => {
 
       if (error) {
         console.error('Error in acceptJobMutation:', error);
-        throw new Error('Failed to update job');
+        throw new Error(error.message || 'Failed to update job');
       }
 
       if (!data.success) {
-        throw new Error(data.message);
+        throw new Error(data.message || 'Could not assign job');
       }
 
       return data;

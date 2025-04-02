@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,8 +30,21 @@ const LiaisonDashboard = () => {
     startPickup,
     completePickup,
     resignJob,
+    liaisonProfile,
+    updateCurrentLocation
   } = useLiaisonDashboard();
   const [jobInFocus, setJobInFocus] = useState<string | null>(null);
+
+  // Get location on load
+  useEffect(() => {
+    updateCurrentLocation();
+    // Refresh location every 5 minutes
+    const interval = setInterval(() => {
+      updateCurrentLocation();
+    }, 300000);
+    
+    return () => clearInterval(interval);
+  }, [updateCurrentLocation]);
 
   const handleLogout = async () => {
     await logout();
@@ -123,7 +136,11 @@ const LiaisonDashboard = () => {
                 <ShieldCheck className="h-5 w-5 mr-2" />
                 Active
               </div>
-              <p className="text-gray-500 mb-4">Ready for deliveries</p>
+              <p className="text-gray-500 mb-4">
+                {liaisonProfile ? 
+                  `Assigned: ${liaisonProfile.current_job_count}/${liaisonProfile.max_concurrent_jobs} jobs` : 
+                  'Loading capacity...'}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -415,8 +432,10 @@ const LiaisonDashboard = () => {
                         variant="secondary"
                         size="sm"
                         onClick={() => acceptJob(job.id)}
+                        disabled={liaisonProfile && liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs}
                       >
-                        Accept Job
+                        {liaisonProfile && liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs ? 
+                          "At Capacity" : "Accept Job"}
                       </Button>
                     </CardFooter>
                   </Card>
