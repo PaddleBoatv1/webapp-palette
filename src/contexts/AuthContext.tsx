@@ -33,15 +33,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearAllAuthData = async (): Promise<void> => {
     try {
+      // Force global signout to clear all sessions
       await supabase.auth.signOut({ scope: 'global' });
+      
+      // Clear all browser storage
       localStorage.clear();
       sessionStorage.clear();
+      
+      // Clear cookies
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
           .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
       });
+      
       setUser(null);
+      
       toast({
         title: "Auth Data Cleared",
         description: "All authentication data has been cleared",
@@ -160,8 +167,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      const { error } = await supabase.auth.signOut();
+      // Use global scope to clear all sessions across all tabs and devices
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) throw error;
+      
+      // Explicitly clear all local storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+      });
       
       setUser(null);
       
@@ -170,7 +189,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "You have been logged out successfully",
       });
       
-      navigate('/', { replace: true });
+      // Navigate to login page instead of home
+      navigate('/login', { replace: true });
     } catch (error: any) {
       console.error('Logout error:', error);
       toast({
