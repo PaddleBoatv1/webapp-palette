@@ -82,8 +82,12 @@ const UserTrips: React.FC<UserTripsProps> = ({ userId }) => {
                       </div>
                       
                       <h4 className="font-medium text-lg mt-2">
-                        {reservation.start_zone?.zone_name || 'Unknown'} → {reservation.end_zone?.zone_name || 'Unknown'}
+                        Booking ID: #{reservation.id.substring(0, 8)}
                       </h4>
+                      
+                      <p className="text-sm text-gray-600 mt-1">
+                        {reservation.start_zone?.zone_name || 'Unknown'} → {reservation.end_zone?.zone_name || 'Unknown'}
+                      </p>
                       
                       <div className="mt-2 space-y-1">
                         <div className="flex items-center">

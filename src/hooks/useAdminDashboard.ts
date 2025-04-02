@@ -195,8 +195,9 @@ export function useAdminDashboard() {
     const total = allBoats?.length || 0;
     const available = allBoats?.filter(boat => boat.status === 'available').length || 0;
     const inUse = allBoats?.filter(boat => boat.status === 'in_use').length || 0;
+    const maintenance = allBoats?.filter(boat => boat.status === 'maintenance').length || 0;
     
-    return { total, available, inUse };
+    return { total, available, inUse, maintenance };
   }, [allBoats]);
 
   // Compute reservation statistics
@@ -413,11 +414,93 @@ export function useAdminDashboard() {
     }
   });
 
+  // Mutation to add a new boat
+  const addBoatMutation = useMutation({
+    mutationFn: async ({ boat_name }: { boat_name: string }) => {
+      console.log('Adding new boat:', boat_name);
+      
+      const { data, error } = await supabase
+        .from('boats')
+        .insert([
+          { 
+            boat_name,
+            status: 'available'
+          }
+        ])
+        .select();
+        
+      if (error) {
+        console.error('Error adding boat:', error);
+        throw error;
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'allBoats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'availableBoats'] });
+      
+      toast({
+        title: "Boat Added",
+        description: "New boat has been added to the fleet."
+      });
+    },
+    onError: (error) => {
+      console.error('Error adding boat:', error);
+      toast({
+        title: "Failed to Add Boat",
+        description: "There was an error adding the new boat. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Mutation to update boat status
+  const updateBoatStatusMutation = useMutation({
+    mutationFn: async ({ boatId, newStatus }: { boatId: string, newStatus: string }) => {
+      console.log('Updating boat', boatId, 'status to', newStatus);
+      
+      const { data, error } = await supabase
+        .from('boats')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', boatId)
+        .select();
+        
+      if (error) {
+        console.error('Error updating boat status:', error);
+        throw error;
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'allBoats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'availableBoats'] });
+      
+      toast({
+        title: "Boat Status Updated",
+        description: "The boat status has been updated successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating boat status:', error);
+      toast({
+        title: "Update Failed",
+        description: "There was an error updating the boat status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
   return {
     reservations,
     pendingReservations,
     availableBoats,
     availableLiaisons,
+    allBoats,
     isLoadingLiaisons,
     zones,
     isLoadingZones,
@@ -430,6 +513,8 @@ export function useAdminDashboard() {
     assignBoatMutation,
     assignLiaisonMutation,
     updateReservationStatusMutation,
+    addBoatMutation,
+    updateBoatStatusMutation,
     // Add the computed statistics
     boatStats,
     reservationStats,

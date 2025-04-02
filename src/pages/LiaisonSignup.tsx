@@ -6,9 +6,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, Info, User as UserIcon } from "lucide-react";
+import { AlertCircle, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import GoogleIcon from "@/components/icons/GoogleIcon";
 
 const LiaisonSignup = () => {
   const navigate = useNavigate();
@@ -17,7 +18,6 @@ const LiaisonSignup = () => {
   const [phone, setPhone] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleGoogleLogin = async () => {
     try {
@@ -96,10 +96,10 @@ const LiaisonSignup = () => {
             variant="default"
             type="button"
             className="w-full mt-4"
-            disabled={isLoading || isSubmitting}
+            disabled={isLoading}
             onClick={handleGoogleLogin}
           >
-            <UserIcon className="mr-2 h-4 w-4" />
+            <GoogleIcon className="mr-2 h-4 w-4" />
             Continue with Google
           </Button>
           

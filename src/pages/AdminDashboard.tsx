@@ -5,13 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { BarChart, PieChart, LineChart, CheckCircle, AlertCircle, Clock, LogOut, Truck, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { 
+  BarChart, PieChart, LineChart, CheckCircle, AlertCircle, 
+  Clock, LogOut, Truck, User, Search, Plus, Ship, RefreshCw 
+} from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import ZoneManager from "@/components/admin/ZoneManager";
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatStatus, getStatusBadgeVariant } from '@/lib/utils';
+import { 
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
+} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
@@ -22,16 +31,27 @@ const AdminDashboard = () => {
     zoneStats,
     zones, 
     isLoadingZones,
+    reservations,
     pendingReservations,
+    allBoats,
     availableBoats,
     availableLiaisons,
     isLoadingLiaisons,
+    isLoadingReservations,
+    isLoadingBoats,
     assignBoatMutation,
     assignLiaisonMutation,
     updateReservationStatusMutation,
-    isLoadingReservations
+    addBoatMutation,
+    updateBoatStatusMutation,
+    statusFilter,
+    setStatusFilter
   } = useAdminDashboard();
   
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newBoatName, setNewBoatName] = useState('');
+  const [isAddBoatDialogOpen, setIsAddBoatDialogOpen] = useState(false);
+
   useEffect(() => {
     // Log user info for debugging
     console.log("Admin Dashboard - Current user:", user);
@@ -53,6 +73,28 @@ const AdminDashboard = () => {
   const updateStatus = (reservationId: string, newStatus: string) => {
     updateReservationStatusMutation.mutate({ reservationId, newStatus });
   };
+
+  const updateBoatStatus = (boatId: string, newStatus: string) => {
+    updateBoatStatusMutation.mutate({ boatId, newStatus });
+  };
+  
+  const handleAddBoat = () => {
+    if (newBoatName.trim()) {
+      addBoatMutation.mutate({ boat_name: newBoatName.trim() });
+      setNewBoatName('');
+      setIsAddBoatDialogOpen(false);
+    }
+  };
+
+  // Filter reservations by search term
+  const filteredReservations = reservations?.filter(reservation => {
+    // Search by reservation ID or user email/name
+    return (
+      reservation.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reservation.users?.[0]?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reservation.users?.[0]?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -142,6 +184,10 @@ const AdminDashboard = () => {
               <Clock className="h-4 w-4 mr-2" />
               Reservations
             </TabsTrigger>
+            <TabsTrigger value="boats">
+              <Ship className="h-4 w-4 mr-2" />
+              Boat Management
+            </TabsTrigger>
             <TabsTrigger value="analytics">
               <BarChart className="h-4 w-4 mr-2" />
               Analytics
@@ -153,6 +199,150 @@ const AdminDashboard = () => {
           </TabsList>
           
           <TabsContent value="reservations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <CardTitle>Reservations</CardTitle>
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <div className="relative w-full sm:w-auto">
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Search by ID or customer..." 
+                        className="pl-8 w-full"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Reservations</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
+                        <SelectItem value="awaiting_pickup">Awaiting Pickup</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="canceled">Canceled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingReservations ? (
+                  <div className="h-40 flex items-center justify-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                  </div>
+                ) : filteredReservations && filteredReservations.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Booking ID</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>From/To</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredReservations.map((reservation: any) => (
+                          <TableRow key={reservation.id}>
+                            <TableCell className="font-medium">
+                              {reservation.id.substring(0, 8)}
+                            </TableCell>
+                            <TableCell>
+                              {reservation.users?.[0]?.full_name || 'Guest User'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusBadgeVariant(reservation.status)}>
+                                {formatStatus(reservation.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {reservation.start_zone?.[0]?.zone_name || 'Unknown'} → {reservation.end_zone?.[0]?.zone_name || 'Unknown'}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(reservation.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Select onValueChange={(value) => updateStatus(reservation.id, value)}>
+                                  <SelectTrigger className="h-8 w-24">
+                                    <SelectValue placeholder="Status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectGroup>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                                      <SelectItem value="in_progress">In Progress</SelectItem>
+                                      <SelectItem value="awaiting_pickup">Awaiting Pickup</SelectItem>
+                                      <SelectItem value="completed">Completed</SelectItem>
+                                      <SelectItem value="canceled">Canceled</SelectItem>
+                                    </SelectGroup>
+                                  </SelectContent>
+                                </Select>
+
+                                {reservation.status === 'pending' && (
+                                  <Select onValueChange={(value) => assignBoat(reservation.id, value)}>
+                                    <SelectTrigger className="h-8 w-24">
+                                      <SelectValue placeholder="Boat" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectGroup>
+                                        {availableBoats && availableBoats.length > 0 ? (
+                                          availableBoats.map((boat: any) => (
+                                            <SelectItem key={boat.id} value={boat.id}>
+                                              {boat.boat_name}
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="none" disabled>No boats available</SelectItem>
+                                        )}
+                                      </SelectGroup>
+                                    </SelectContent>
+                                  </Select>
+                                )}
+
+                                {reservation.status === 'confirmed' && (
+                                  <Select onValueChange={(value) => assignLiaison(reservation.id, value)}>
+                                    <SelectTrigger className="h-8 w-24">
+                                      <SelectValue placeholder="Liaison" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectGroup>
+                                        {!isLoadingLiaisons && availableLiaisons && availableLiaisons.length > 0 ? (
+                                          availableLiaisons.map((liaison: any) => (
+                                            <SelectItem key={liaison.id} value={liaison.id}>
+                                              {liaison.users[0]?.full_name || liaison.users[0]?.email} ({liaison.current_job_count}/{liaison.max_concurrent_jobs})
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="none" disabled>No liaisons available</SelectItem>
+                                        )}
+                                      </SelectGroup>
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="h-40 flex flex-col items-center justify-center text-gray-500">
+                    <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                    <p>No reservations found</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Pending Reservations</CardTitle>
@@ -273,6 +463,102 @@ const AdminDashboard = () => {
                   <div className="h-40 flex flex-col items-center justify-center text-gray-500">
                     <CheckCircle className="h-8 w-8 mb-2 text-green-500" />
                     <p>No pending reservations to handle</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="boats" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Boat Management</CardTitle>
+                  <Dialog open={isAddBoatDialogOpen} onOpenChange={setIsAddBoatDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add New Boat
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Boat</DialogTitle>
+                        <DialogDescription>
+                          Enter the details for the new boat.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="boat-name">Boat Name</Label>
+                          <Input 
+                            id="boat-name" 
+                            value={newBoatName} 
+                            onChange={(e) => setNewBoatName(e.target.value)} 
+                            placeholder="Enter boat name"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddBoatDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddBoat}>Add Boat</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingBoats ? (
+                  <div className="h-40 flex items-center justify-center">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                  </div>
+                ) : allBoats && allBoats.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Boat ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allBoats.map((boat: any) => (
+                          <TableRow key={boat.id}>
+                            <TableCell className="font-medium">{boat.id.substring(0, 8)}</TableCell>
+                            <TableCell>{boat.boat_name}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                boat.status === 'available' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+                                boat.status === 'in_use' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
+                                boat.status === 'maintenance' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' :
+                                'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                              }>
+                                {boat.status.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Select onValueChange={(value) => updateBoatStatus(boat.id, value)}>
+                                <SelectTrigger className="h-8 w-[120px]">
+                                  <SelectValue placeholder="Change status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="available">Available</SelectItem>
+                                  <SelectItem value="in_use">In Use</SelectItem>
+                                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="h-40 flex flex-col items-center justify-center text-gray-500">
+                    <AlertCircle className="h-8 w-8 mb-2 text-amber-500" />
+                    <p>No boats found. Add your first boat.</p>
                   </div>
                 )}
               </CardContent>
