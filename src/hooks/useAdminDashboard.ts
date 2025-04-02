@@ -174,14 +174,25 @@ export function useAdminDashboard() {
     mutationFn: async ({ reservationId, newStatus }: { reservationId: string, newStatus: string }) => {
       console.log('Updating reservation', reservationId, 'status to', newStatus);
       
+      // Prepare the update data based on the new status
+      const updateData: any = { 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add specific timestamp fields based on status transition
+      if (newStatus === 'in_progress') {
+        updateData.start_time = new Date().toISOString();
+      } else if (newStatus === 'completed') {
+        updateData.end_time = new Date().toISOString();
+      }
+      
+      // For awaiting_pickup status, we don't need any special fields
+      
+      // Perform the update
       const { data, error } = await supabase
         .from('reservations')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-          ...(newStatus === 'in_progress' ? { start_time: new Date().toISOString() } : {}),
-          ...(newStatus === 'completed' ? { end_time: new Date().toISOString() } : {})
-        })
+        .update(updateData)
         .eq('id', reservationId)
         .select();
         
@@ -192,20 +203,29 @@ export function useAdminDashboard() {
       
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'reservations'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'pendingReservations'] });
       
+      const statusMessages = {
+        'in_progress': 'Trip started successfully',
+        'awaiting_pickup': 'Boat marked for return successfully',
+        'completed': 'Trip completed successfully',
+        'canceled': 'Reservation canceled successfully'
+      };
+      
+      const statusMessage = statusMessages[variables.newStatus as keyof typeof statusMessages] || 'Status updated successfully';
+      
       toast({
         title: "Status Updated",
-        description: "The reservation status has been successfully updated."
+        description: statusMessage
       });
     },
     onError: (error) => {
       console.error('Error updating status:', error);
       toast({
         title: "Update Failed",
-        description: "There was an error updating the reservation status.",
+        description: "There was an error updating the reservation status. Please try again.",
         variant: "destructive"
       });
     }
