@@ -59,3 +59,15 @@ export function parseCoordinates(coordinates: any): { lat: number; lng: number }
   
   return { lat: 0, lng: 0 };
 }
+
+/**
+ * Gets formatted latitude and longitude strings from an object,
+ * safely handling missing or invalid coordinate data
+ */
+export function getCoordinates(coordinates: any): { lat: string; lng: string } {
+  const parsedCoords = parseCoordinates(coordinates);
+  return {
+    lat: formatCoordinate(parsedCoords.lat),
+    lng: formatCoordinate(parsedCoords.lng)
+  };
+}
