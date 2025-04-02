@@ -1,9 +1,8 @@
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
-import { Zone } from '@/lib/supabase';
 
 export function useAdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -14,7 +13,8 @@ export function useAdminDashboard() {
     data: reservations, 
     isLoading: isLoadingReservations,
     isError: isReservationsError,
-    error: reservationsError
+    error: reservationsError,
+    refetch: refetchReservations
   } = useQuery({
     queryKey: ['admin', 'reservations', statusFilter],
     queryFn: async () => {
@@ -52,7 +52,6 @@ export function useAdminDashboard() {
         throw error;
       }
       
-      console.log('Fetched reservations:', data);
       return data || [];
     },
     refetchOnWindowFocus: false
@@ -60,7 +59,8 @@ export function useAdminDashboard() {
 
   // Query to fetch pending reservations specifically
   const { 
-    data: pendingReservations
+    data: pendingReservations,
+    refetch: refetchPendingReservations
   } = useQuery({
     queryKey: ['admin', 'pendingReservations'],
     queryFn: async () => {
@@ -85,7 +85,6 @@ export function useAdminDashboard() {
         throw error;
       }
       
-      console.log('Fetched pending reservations:', data);
       return data || [];
     },
     refetchOnWindowFocus: false
@@ -94,7 +93,8 @@ export function useAdminDashboard() {
   // Query to fetch available boats
   const { 
     data: availableBoats, 
-    isLoading: isLoadingBoats 
+    isLoading: isLoadingBoats,
+    refetch: refetchAvailableBoats
   } = useQuery({
     queryKey: ['admin', 'availableBoats'],
     queryFn: async () => {
@@ -110,7 +110,6 @@ export function useAdminDashboard() {
         throw error;
       }
       
-      console.log('Fetched available boats:', data);
       return data || [];
     },
     refetchOnWindowFocus: false
@@ -151,7 +150,8 @@ export function useAdminDashboard() {
   // Query to fetch all boats for stats
   const { 
     data: allBoats,
-    isLoading: isLoadingAllBoats 
+    isLoading: isLoadingAllBoats,
+    refetch: refetchAllBoats
   } = useQuery({
     queryKey: ['admin', 'allBoats'],
     queryFn: async () => {
@@ -271,10 +271,11 @@ export function useAdminDashboard() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'reservations'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'pendingReservations'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'availableBoats'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'allBoats'] });
+      // Refetch all relevant queries to update UI
+      refetchReservations();
+      refetchPendingReservations();
+      refetchAvailableBoats();
+      refetchAllBoats();
       
       toast({
         title: "Boat Assigned",
@@ -286,64 +287,6 @@ export function useAdminDashboard() {
       toast({
         title: "Assignment Failed",
         description: "There was an error assigning the boat. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Mutation to assign liaison to delivery job
-  const assignLiaisonMutation = useMutation({
-    mutationFn: async ({ reservationId, liaisonId }: { reservationId: string, liaisonId: string }) => {
-      console.log('Assigning liaison', liaisonId, 'to delivery job for reservation', reservationId);
-      
-      // Find the delivery job for this reservation
-      const { data: deliveryJobs, error: jobError } = await supabase
-        .from('delivery_jobs')
-        .select('id')
-        .eq('reservation_id', reservationId)
-        .eq('status', 'available')
-        .eq('job_type', 'delivery')
-        .limit(1);
-        
-      if (jobError) {
-        console.error('Error finding delivery job:', jobError);
-        throw jobError;
-      }
-      
-      if (!deliveryJobs || deliveryJobs.length === 0) {
-        throw new Error('No available delivery job found for this reservation');
-      }
-      
-      const jobId = deliveryJobs[0].id;
-      
-      // Call the database function to assign the job
-      const { data, error } = await supabase
-        .rpc('assign_delivery_job', {
-          job_id: jobId,
-          assign_to_liaison_id: liaisonId
-        });
-        
-      if (error) {
-        console.error('Error assigning liaison:', error);
-        throw error;
-      }
-      
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'availableLiaisons'] });
-      
-      toast({
-        title: "Liaison Assigned",
-        description: "The delivery job has been assigned to the selected liaison.",
-        variant: "default"
-      });
-    },
-    onError: (error: any) => {
-      console.error('Error assigning liaison:', error);
-      toast({
-        title: "Assignment Failed",
-        description: error.message || "There was an error assigning the liaison. Please try again.",
         variant: "destructive"
       });
     }
@@ -385,8 +328,8 @@ export function useAdminDashboard() {
       return data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'reservations'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'pendingReservations'] });
+      refetchReservations();
+      refetchPendingReservations();
       
       const statusMessages = {
         'pending': 'Reservation status set to pending',
@@ -437,8 +380,8 @@ export function useAdminDashboard() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'allBoats'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'availableBoats'] });
+      refetchAllBoats();
+      refetchAvailableBoats();
       
       toast({
         title: "Boat Added",
@@ -477,8 +420,8 @@ export function useAdminDashboard() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'allBoats'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'availableBoats'] });
+      refetchAllBoats();
+      refetchAvailableBoats();
       
       toast({
         title: "Boat Status Updated",
@@ -511,11 +454,9 @@ export function useAdminDashboard() {
     statusFilter,
     setStatusFilter,
     assignBoatMutation,
-    assignLiaisonMutation,
     updateReservationStatusMutation,
     addBoatMutation,
     updateBoatStatusMutation,
-    // Add the computed statistics
     boatStats,
     reservationStats,
     zoneStats

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/use-auth';
 import { toast } from '@/hooks/use-toast';
 
 export interface Reservation {
@@ -69,7 +69,7 @@ export const useLiaisonDashboard = () => {
   }, [user]);
 
   // Query available jobs
-  const { data: availableJobsData, isLoading: isAvailableLoading } = useQuery({
+  const { data: availableJobsData, isLoading: isAvailableLoading, refetch: refetchAvailableJobs } = useQuery({
     queryKey: ['availableJobs'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -123,7 +123,7 @@ export const useLiaisonDashboard = () => {
   });
 
   // Query assigned jobs
-  const { data: assignedJobsData, isLoading: isAssignedLoading } = useQuery({
+  const { data: assignedJobsData, isLoading: isAssignedLoading, refetch: refetchAssignedJobs } = useQuery({
     queryKey: ['assignedJobs', liaisonId],
     queryFn: async () => {
       if (!liaisonId) return [];
@@ -198,8 +198,10 @@ export const useLiaisonDashboard = () => {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      // Refetch both queries to update UI
+      refetchAvailableJobs();
+      refetchAssignedJobs();
+      
       toast({
         title: 'Job Accepted',
         description: 'You have successfully accepted this job',
@@ -231,8 +233,8 @@ export const useLiaisonDashboard = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
+      refetchAssignedJobs();
+      refetchAvailableJobs();
     },
     onError: (error: any) => {
       toast({
@@ -255,6 +257,11 @@ export const useLiaisonDashboard = () => {
         
       if (error) throw error;
       return data;
+    },
+    onSuccess: () => {
+      // Refetch to ensure all data is up to date
+      refetchAssignedJobs();
+      refetchAvailableJobs();
     },
     onError: (error: any) => {
       toast({
@@ -300,8 +307,8 @@ export const useLiaisonDashboard = () => {
         if (updateError) throw updateError;
       }
       
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
+      refetchAssignedJobs();
+      refetchAvailableJobs();
       
       toast({
         title: 'Job Resigned',
@@ -334,7 +341,7 @@ export const useLiaisonDashboard = () => {
     }
   };
 
-  // Function to complete delivery
+  // Function to complete delivery (Liaison delivers the boat to customer)
   const completeDelivery = async (jobId: string) => {
     try {
       const { data: jobData } = await supabase
@@ -356,8 +363,12 @@ export const useLiaisonDashboard = () => {
       
       toast({
         title: 'Delivery Completed',
-        description: 'You have completed the delivery',
+        description: 'You have completed the delivery. The customer can now use the boat.',
       });
+      
+      // Force refetch to update the UI
+      refetchAssignedJobs();
+      refetchAvailableJobs();
     } catch (error) {
       console.error('Error completing delivery:', error);
     }
@@ -376,7 +387,7 @@ export const useLiaisonDashboard = () => {
     }
   };
 
-  // Function to complete pickup
+  // Function to complete pickup (Liaison retrieves the boat after customer finishes)
   const completePickup = async (jobId: string) => {
     try {
       const { data: jobData } = await supabase
@@ -396,10 +407,28 @@ export const useLiaisonDashboard = () => {
         status: 'completed' 
       });
       
+      // Update the boat status to available
+      const { data: reservationData } = await supabase
+        .from('reservations')
+        .select('boat_id')
+        .eq('id', jobData.reservation_id)
+        .single();
+        
+      if (reservationData?.boat_id) {
+        await supabase
+          .from('boats')
+          .update({ status: 'available' })
+          .eq('id', reservationData.boat_id);
+      }
+      
       toast({
         title: 'Pickup Completed',
-        description: 'You have completed the pickup',
+        description: 'You have completed the pickup and the reservation is now finished',
       });
+      
+      // Force refetch to update the UI
+      refetchAssignedJobs();
+      refetchAvailableJobs();
     } catch (error) {
       console.error('Error completing pickup:', error);
     }
