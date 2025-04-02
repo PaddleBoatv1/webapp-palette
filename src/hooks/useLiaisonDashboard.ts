@@ -57,7 +57,18 @@ export function useLiaisonDashboard(userId?: string) {
         throw error;
       }
       
-      return data || [];
+      // Process the data to ensure correct shape
+      const processedData = data?.map(job => ({
+        ...job,
+        reservation: {
+          ...job.reservation,
+          users: job.reservation?.users || { email: 'Unknown', full_name: '' },
+          start_zone: job.reservation?.start_zone || { zone_name: 'Unknown' },
+          end_zone: job.reservation?.end_zone || { zone_name: 'Unknown' }
+        }
+      }));
+      
+      return processedData || [];
     },
     refetchInterval: 30000 // Refresh every 30 seconds
   });
@@ -100,7 +111,18 @@ export function useLiaisonDashboard(userId?: string) {
         throw error;
       }
       
-      return data || [];
+      // Process the data to ensure correct shape
+      const processedData = data?.map(job => ({
+        ...job,
+        reservation: {
+          ...job.reservation,
+          users: job.reservation?.users || { email: 'Unknown', full_name: '' },
+          start_zone: job.reservation?.start_zone || { zone_name: 'Unknown' },
+          end_zone: job.reservation?.end_zone || { zone_name: 'Unknown' }
+        }
+      }));
+      
+      return processedData || [];
     },
     enabled: !!liaisonData?.id,
     refetchInterval: 10000 // Refresh every 10 seconds

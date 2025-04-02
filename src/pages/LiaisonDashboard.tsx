@@ -29,9 +29,61 @@ import {
 import { Loader2, Ship, MapPin, Phone, Mail, Navigation, CheckCircle, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 
+// Define a custom variant type for Badge to include 'success'
+type CustomBadgeVariant = "default" | "destructive" | "outline" | "secondary" | "success";
+// Extend the Badge component to accept our custom variant
+const CustomBadge = (props: React.ComponentProps<typeof Badge> & { variant?: CustomBadgeVariant }) => {
+  // Map 'success' to an appropriate class name
+  const className = props.variant === 'success' 
+    ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' 
+    : props.className;
+  
+  // Remove 'success' from the variant before passing to Badge
+  const badgeProps = {
+    ...props,
+    variant: props.variant === 'success' ? 'outline' : props.variant,
+    className
+  };
+  
+  return <Badge {...badgeProps} />;
+};
+
+// Define interfaces for typesafety
+interface ReservationUser {
+  id: string;
+  email: string;
+  full_name?: string;
+  phone_number?: string;
+}
+
+interface Zone {
+  id: string;
+  zone_name: string;
+  coordinates?: any;
+}
+
+interface Reservation {
+  id: string;
+  users: ReservationUser;
+  status: string;
+  start_zone?: Zone;
+  end_zone?: Zone;
+}
+
+interface DeliveryJob {
+  id: string;
+  job_type: string;
+  status: string;
+  created_at: string;
+  assigned_at?: string;
+  completed_at?: string;
+  reservation: Reservation;
+  liaison_id?: string;
+}
+
 const LiaisonDashboard = () => {
   const { user } = useAuth();
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<DeliveryJob | null>(null);
   const [jobDetailsOpen, setJobDetailsOpen] = useState(false);
   
   const {
@@ -46,11 +98,11 @@ const LiaisonDashboard = () => {
     updateJobStatusMutation
   } = useLiaisonDashboard(user?.id);
 
-  const handleAcceptJob = (job: any) => {
+  const handleAcceptJob = (job: DeliveryJob) => {
     acceptJobMutation.mutate(job.id);
   };
 
-  const openJobDetails = (job: any) => {
+  const openJobDetails = (job: DeliveryJob) => {
     setSelectedJob(job);
     setJobDetailsOpen(true);
   };
@@ -105,7 +157,7 @@ const LiaisonDashboard = () => {
     }
   };
 
-  const getActionsForJobStatus = (job: any) => {
+  const getActionsForJobStatus = (job: DeliveryJob) => {
     switch (job.status) {
       case 'assigned':
         return (
@@ -115,15 +167,15 @@ const LiaisonDashboard = () => {
         );
       case 'in_progress':
         return (
-          <Button size="sm" variant="success" onClick={() => handleUpdateStatus(job.id, 'completed')}>
+          <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleUpdateStatus(job.id, 'completed')}>
             Complete {job.job_type === 'delivery' ? 'Delivery' : 'Pickup'}
           </Button>
         );
       case 'completed':
         return (
-          <Badge variant="outline" className="bg-green-50 text-green-800">
+          <CustomBadge variant="outline" className="bg-green-50 text-green-800">
             Completed
-          </Badge>
+          </CustomBadge>
         );
       default:
         return null;
@@ -148,15 +200,15 @@ const LiaisonDashboard = () => {
           </div>
           <div>
             <div className="text-right">
-              <p className="font-semibold">{user?.full_name || user?.email}</p>
+              <p className="font-semibold">{user?.full_name || user?.name || user?.email}</p>
               <Badge variant="outline" className="mt-1">
                 Delivery Executive
               </Badge>
             </div>
             <div className="mt-2 text-right">
-              <Badge variant={liaisonData?.is_active ? "success" : "destructive"}>
+              <CustomBadge variant={liaisonData?.is_active ? "success" : "destructive"}>
                 {liaisonData?.is_active ? 'Active' : 'Inactive'}
-              </Badge>
+              </CustomBadge>
               <Badge variant="outline" className="ml-2">
                 Jobs: {liaisonData?.current_job_count || 0}/{liaisonData?.max_concurrent_jobs || 3}
               </Badge>
@@ -201,7 +253,7 @@ const LiaisonDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {assignedJobs?.length === 0 ? (
+              {!assignedJobs?.length ? (
                 <div className="text-center py-8 text-gray-500">
                   You don't have any {filterStatus !== 'all' ? filterStatus : ''} jobs assigned at this time.
                 </div>
@@ -219,7 +271,7 @@ const LiaisonDashboard = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {assignedJobs?.map((job) => (
+                      {assignedJobs?.map((job: DeliveryJob) => (
                         <TableRow key={job.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openJobDetails(job)}>
                           <TableCell>
                             <Badge variant={job.job_type === 'delivery' ? "secondary" : "outline"}>
@@ -266,13 +318,13 @@ const LiaisonDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {availableJobs?.length === 0 ? (
+              {!availableJobs?.length ? (
                 <div className="text-center py-8 text-gray-500">
                   There are no available jobs at this time.
                 </div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {availableJobs?.map((job) => (
+                  {availableJobs?.map((job: DeliveryJob) => (
                     <Card key={job.id} className="overflow-hidden">
                       <div className={`px-4 py-2 ${job.job_type === 'delivery' ? 'bg-blue-50' : 'bg-orange-50'}`}>
                         <Badge variant={job.job_type === 'delivery' ? "secondary" : "outline"}>

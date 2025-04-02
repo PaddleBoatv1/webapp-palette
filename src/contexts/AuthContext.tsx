@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -10,6 +9,7 @@ interface User {
   name: string;
   photoUrl?: string;
   role?: string;
+  full_name?: string;
 }
 
 interface AuthContextType {
@@ -19,6 +19,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   clearAllAuthData: () => Promise<void>;
+  signup: (email: string, password: string, metadata?: any) => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,26 +29,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Function to clear all auth data (useful for resetting state)
   const clearAllAuthData = async (): Promise<void> => {
     try {
-      // Sign out from Supabase with global scope to clear all sessions
       await supabase.auth.signOut({ scope: 'global' });
-      
-      // Clear any stored data
       localStorage.clear();
       sessionStorage.clear();
-      
-      // Clear cookies
       document.cookie.split(";").forEach((c) => {
         document.cookie = c
           .replace(/^ +/, "")
           .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
       });
-      
-      // Clear in-memory state
       setUser(null);
-      
       toast({
         title: "Auth Data Cleared",
         description: "All authentication data has been cleared",
@@ -62,32 +54,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Check if user is an admin - attempts to get from DB but uses fallback methods
   const checkAdminStatus = async (userId: string) => {
     try {
-      // First try to get the role from the users table
       const { data, error } = await supabase
         .from('users')
         .select('role')
         .eq('id', userId)
         .single();
-
+      
       if (error) {
         console.error("Error fetching user role:", error);
-        return 'customer'; // Default to customer on error
+        return 'customer';
       }
       
       return data?.role || 'customer';
     } catch (error) {
       console.error("Error in admin check:", error);
-      return 'customer'; // Default to customer on error
+      return 'customer';
     }
   };
 
-  // Enhanced user session handler with better admin role detection
   const handleAuthChange = async (session: any) => {
     if (session?.user) {
-      // Check if the user was created through the database admin page
       let userRole = 'customer';
       
       try {
@@ -97,13 +85,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("Role detection error:", error);
       }
       
-      // Set user info with the determined role
       setUser({
         id: session.user.id,
         email: session.user.email || '',
         name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
         photoUrl: session.user.user_metadata?.avatar_url,
-        role: userRole // Set the role we determined
+        role: userRole
       });
       
       console.log("User authenticated:", session.user.id, "with role:", userRole);
@@ -114,7 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Set up auth state listener
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -129,7 +115,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
     
-    // Check for existing session on initial load
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         handleAuthChange(session);
@@ -194,6 +179,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signup = async (email: string, password: string, metadata = {}) => {
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: metadata
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert([{ 
+            id: data.user.id,
+            email: data.user.email,
+            full_name: metadata.full_name,
+            phone_number: metadata.phone_number,
+            role: metadata.role || 'customer'
+          }]);
+        
+        if (profileError) throw profileError;
+      }
+      
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      return { data: null, error };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -201,7 +223,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthenticated: !!user, 
       loginWithGoogle, 
       logout,
-      clearAllAuthData
+      clearAllAuthData,
+      signup
     }}>
       {children}
     </AuthContext.Provider>
