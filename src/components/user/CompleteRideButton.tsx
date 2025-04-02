@@ -12,31 +12,14 @@ interface CompleteRideButtonProps {
 export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservationId }) => {
   const queryClient = useQueryClient();
   
-  // First check if a pickup job already exists for this reservation
-  const { data: existingJobs, isLoading } = useQuery({
-    queryKey: ['existingPickupJobs', reservationId],
-    queryFn: async () => {
-      console.log("Checking for existing pickup jobs for reservation:", reservationId);
-      const { data, error } = await supabase
-        .from('delivery_jobs')
-        .select('*')
-        .eq('reservation_id', reservationId)
-        .eq('job_type', 'pickup');
-      
-      if (error) {
-        console.error("Error checking existing pickup jobs:", error);
-        return [];
-      }
-      
-      console.log("Existing pickup jobs:", data); // Debug log
-      return data || [];
-    }
-  });
-  
+  // We no longer need to check for existing pickup jobs since we'll rely on the trigger
   const completeRideMutation = useMutation({
     mutationFn: async () => {
       try {
-        // First update reservation status to "awaiting_pickup"
+        console.log("Completing ride for reservation:", reservationId);
+        
+        // Update reservation status to "awaiting_pickup"
+        // This will trigger the database function to create a pickup job
         const { error } = await supabase
           .from('reservations')
           .update({ status: 'awaiting_pickup' })
@@ -47,31 +30,8 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
           throw new Error(error.message || "Failed to complete ride");
         }
         
-        // Only create a pickup job if none exist
-        if (!existingJobs || existingJobs.length === 0) {
-          // Log that we're creating a new pickup job
-          console.log("No existing pickup jobs found, creating a new one for reservation:", reservationId);
-          
-          // Explicitly create the pickup job to ensure it works regardless of RLS policies
-          const { error: jobError } = await supabase
-            .from('delivery_jobs')
-            .insert([
-              { 
-                reservation_id: reservationId, 
-                job_type: 'pickup', 
-                status: 'available'
-              }
-            ]);
-          
-          if (jobError) {
-            console.error("Error creating pickup job:", jobError);
-            // If creating the pickup job fails, we'll still count the ride as complete
-            // but log the error for troubleshooting
-            console.warn("Ride marked as complete but pickup job creation failed:", jobError.message);
-          }
-        } else {
-          console.log(`${existingJobs.length} pickup job(s) already exist, not creating a duplicate`);
-        }
+        // The database trigger will handle creating the pickup job
+        console.log("Ride completed. Database trigger will create pickup job.");
         
         return { success: true };
       } catch (error: any) {
@@ -81,7 +41,6 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userReservations'] });
-      queryClient.invalidateQueries({ queryKey: ['existingPickupJobs'] });
       toast({
         title: "Ride Completed",
         description: "Your ride has been completed and a pickup request has been sent. Please wait at the designated zone for a liaison to collect the boat.",
@@ -103,7 +62,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
   return (
     <Button 
       onClick={handleCompleteRide} 
-      disabled={completeRideMutation.isPending || isLoading}
+      disabled={completeRideMutation.isPending}
       variant="secondary"
       className="bg-green-600 hover:bg-green-700 text-white"
     >

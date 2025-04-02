@@ -225,31 +225,35 @@ export const useLiaisonDashboard = () => {
       }
 
       console.log('Job data:', jobData); // Debug log to see the job data structure
-      console.log('Reservation ID from job:', jobData.reservation_id); // Debug log
 
       // Check liaison capacity
       if (liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs) {
         throw new Error('You have reached your maximum job capacity');
       }
 
-      // Check if the liaison is already assigned to another job for the same reservation
-      // This prevents double-counting when assigning both delivery and pickup jobs
+      // Check if the reservation_id is valid
       if (!jobData.reservation_id) {
-        console.error('Job has no reservation_id, cannot check for existing assignments');
+        console.error('Job has no reservation_id, cannot proceed with assignment');
         throw new Error('Invalid job data: missing reservation ID');
       }
       
+      console.log('Checking for existing jobs for reservation:', jobData.reservation_id);
+      
+      // Check if the liaison is already assigned to another job for the same reservation
       const { data: existingJobs, error: existingJobsError } = await supabase
         .from('delivery_jobs')
-        .select('id, job_type, reservation_id')
+        .select('id, job_type')
         .eq('reservation_id', jobData.reservation_id)
         .eq('liaison_id', liaisonProfile.id);
 
-      console.log('Existing jobs check:', existingJobs); // Debug log
-        
       if (existingJobsError) {
         console.error('Error checking existing jobs:', existingJobsError);
-      } else if (existingJobs && existingJobs.length > 0) {
+      }
+      
+      console.log('Existing jobs for this reservation:', existingJobs);
+      
+      // If the liaison already has a job for this reservation, don't increment the count
+      if (existingJobs && existingJobs.length > 0) {
         console.log('Liaison already has a job for this reservation, not incrementing count');
         
         // Just update the job status without increasing the count

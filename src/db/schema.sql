@@ -1,4 +1,3 @@
-
 -- Schema for Paddle Boat Rental System
 
 -- Users Table
@@ -59,7 +58,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
   boat_id UUID REFERENCES public.boats(id) ON DELETE SET NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'in_progress', 'completed', 'canceled')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'in_progress', 'awaiting_pickup', 'completed', 'canceled')),
   start_time TIMESTAMPTZ,
   end_time TIMESTAMPTZ,
   start_zone_id UUID REFERENCES public.zones(id),
@@ -91,6 +90,19 @@ CREATE TABLE IF NOT EXISTS public.boat_deliveries (
   estimated_arrival TIMESTAMPTZ,
   actual_arrival TIMESTAMPTZ,
   pickup_time TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Delivery Jobs Table (explicitly defined)
+CREATE TABLE IF NOT EXISTS public.delivery_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reservation_id UUID REFERENCES public.reservations(id) ON DELETE CASCADE,
+  liaison_id UUID REFERENCES public.company_liaisons(id) ON DELETE SET NULL,
+  job_type TEXT NOT NULL CHECK (job_type IN ('delivery', 'pickup')),
+  status TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'in_progress', 'completed', 'cancelled')),
+  assigned_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -403,3 +415,95 @@ CREATE INDEX IF NOT EXISTS idx_company_liaisons_user_id ON public.company_liaiso
 CREATE INDEX IF NOT EXISTS idx_boat_deliveries_reservation_id ON public.boat_deliveries(reservation_id);
 CREATE INDEX IF NOT EXISTS idx_boat_deliveries_liaison_id ON public.boat_deliveries(liaison_id);
 CREATE INDEX IF NOT EXISTS idx_waiver_acceptances_user_id ON public.waiver_acceptances(user_id);
+
+-- Function to update boat status when a reservation is completed
+CREATE OR REPLACE FUNCTION public.update_boat_status_on_reservation_complete()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+    UPDATE boats SET status = 'available' WHERE id = NEW.boat_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to create delivery jobs when reservation status changes
+CREATE OR REPLACE FUNCTION public.create_delivery_job_on_reservation_confirm()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'confirmed' AND OLD.status = 'pending' THEN
+    -- Create a delivery job when a reservation is confirmed
+    INSERT INTO delivery_jobs (reservation_id, job_type, status)
+    VALUES (NEW.id, 'delivery', 'available');
+  ELSIF NEW.status = 'awaiting_pickup' AND OLD.status = 'in_progress' THEN
+    -- Check if a pickup job already exists for this reservation
+    IF NOT EXISTS (SELECT 1 FROM delivery_jobs WHERE reservation_id = NEW.id AND job_type = 'pickup') THEN
+      -- Create a pickup job when a reservation is marked as awaiting pickup
+      INSERT INTO delivery_jobs (reservation_id, job_type, status)
+      VALUES (NEW.id, 'pickup', 'available');
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to update liaison job count when job status changes
+CREATE OR REPLACE FUNCTION public.update_liaison_job_count()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    -- If job was assigned to a liaison
+    IF NEW.liaison_id IS NOT NULL AND (OLD.liaison_id IS NULL OR OLD.liaison_id != NEW.liaison_id) THEN
+      -- Check if the liaison already has a job for this reservation
+      IF NOT EXISTS (
+        SELECT 1 FROM delivery_jobs 
+        WHERE reservation_id = NEW.reservation_id 
+        AND liaison_id = NEW.liaison_id 
+        AND id != NEW.id
+      ) THEN
+        -- Only increment if this is the first job for this reservation
+        UPDATE company_liaisons 
+        SET current_job_count = current_job_count + 1
+        WHERE id = NEW.liaison_id;
+      END IF;
+    END IF;
+    
+    -- If job was completed or cancelled and had a liaison assigned
+    IF NEW.status IN ('completed', 'cancelled') AND OLD.status NOT IN ('completed', 'cancelled') 
+       AND OLD.liaison_id IS NOT NULL THEN
+      -- Only decrement if this is the last job for this reservation
+      IF NOT EXISTS (
+        SELECT 1 FROM delivery_jobs 
+        WHERE reservation_id = OLD.reservation_id 
+        AND liaison_id = OLD.liaison_id 
+        AND id != OLD.id 
+        AND status NOT IN ('completed', 'cancelled')
+      ) THEN
+        UPDATE company_liaisons 
+        SET current_job_count = GREATEST(0, current_job_count - 1)
+        WHERE id = OLD.liaison_id;
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add triggers
+DROP TRIGGER IF EXISTS boat_status_update_trigger ON public.reservations;
+CREATE TRIGGER boat_status_update_trigger
+  AFTER UPDATE ON public.reservations
+  FOR EACH ROW
+  EXECUTE FUNCTION update_boat_status_on_reservation_complete();
+
+DROP TRIGGER IF EXISTS create_delivery_job_trigger ON public.reservations;
+CREATE TRIGGER create_delivery_job_trigger
+  AFTER UPDATE ON public.reservations
+  FOR EACH ROW
+  EXECUTE FUNCTION create_delivery_job_on_reservation_confirm();
+
+DROP TRIGGER IF EXISTS update_liaison_job_count_trigger ON public.delivery_jobs;
+CREATE TRIGGER update_liaison_job_count_trigger
+  AFTER UPDATE ON public.delivery_jobs
+  FOR EACH ROW
+  EXECUTE FUNCTION update_liaison_job_count();
