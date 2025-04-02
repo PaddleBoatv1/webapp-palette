@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -89,7 +88,6 @@ const AdminDashboard = () => {
     });
   };
 
-  // Helper function to safely access nested properties
   const getUserName = (reservation: any) => {
     if (!reservation.users) return 'Unknown';
     const userData = Array.isArray(reservation.users) ? reservation.users[0] : reservation.users;
@@ -108,7 +106,6 @@ const AdminDashboard = () => {
     return boatData?.boat_name || 'Not assigned';
   };
 
-  // Helper function to determine what actions are available based on current status
   const getStatusActions = (reservation: any) => {
     switch (reservation.status) {
       case 'pending':
@@ -134,15 +131,17 @@ const AdminDashboard = () => {
         return (
           <Button 
             size="sm" 
+            variant="secondary"
             onClick={() => handleUpdateStatus(reservation.id, 'awaiting_pickup')}
           >
-            Mark Return
+            Mark for Return
           </Button>
         );
       case 'awaiting_pickup':
         return (
           <Button 
             size="sm" 
+            variant="success"
             onClick={() => handleUpdateStatus(reservation.id, 'completed')}
           >
             Complete Trip

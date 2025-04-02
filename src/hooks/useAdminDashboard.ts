@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -187,7 +186,9 @@ export function useAdminDashboard() {
         updateData.end_time = new Date().toISOString();
       }
       
-      // For awaiting_pickup status, we don't need any special fields
+      // For awaiting_pickup status, no additional fields are needed
+      
+      console.log('Update data for status change:', updateData);
       
       // Perform the update
       const { data, error } = await supabase
@@ -201,6 +202,7 @@ export function useAdminDashboard() {
         throw error;
       }
       
+      console.log('Status updated successfully:', data);
       return data;
     },
     onSuccess: (data, variables) => {
