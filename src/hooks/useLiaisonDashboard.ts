@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
@@ -149,7 +150,7 @@ export const useLiaisonDashboard = () => {
     enabled: !!liaisonProfile,
   });
 
-  // Get assigned jobs for this liaison
+  // Get assigned jobs for this liaison - MODIFIED to include both 'assigned' and 'in_progress' statuses
   const { data: assignedJobs, isLoading: isLoadingAssignedJobs } = useQuery({
     queryKey: ['assignedJobs', liaisonProfile?.id],
     queryFn: async () => {
@@ -184,7 +185,7 @@ export const useLiaisonDashboard = () => {
           )
         `)
         .eq('liaison_id', liaisonProfile.id)
-        .eq('status', 'assigned');
+        .in('status', ['assigned', 'in_progress']); // Changed to include both statuses
 
       if (error) {
         console.error('Error fetching assigned jobs:', error);
