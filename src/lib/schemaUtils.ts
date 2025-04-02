@@ -1,5 +1,5 @@
 
-import { supabase } from './supabase';
+import { supabase } from '../integrations/supabase/client';
 import schemaSQL from '../db/schema.sql?raw';
 
 /**
@@ -31,7 +31,7 @@ export const executeSchema = async () => {
         if (error) {
           console.error(`Error executing statement ${i + 1}:`, error);
           // If it's just a "policy already exists" error, we can continue
-          if (error.code === '42710' && error.message.includes('already exists')) {
+          if (error.message && error.message.includes('already exists')) {
             console.log(`Statement ${i + 1} skipped: ${error.message}`);
           } else {
             // For other errors, we should log them but continue

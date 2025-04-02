@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Clock, MapPin, User, Truck, ShieldCheck, AlertTriangle } from "lucide-react";
+import { LogOut, Clock, MapPin, User, Truck, ShieldCheck, AlertTriangle, CheckCircle, History } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiaisonDashboard } from '@/hooks/useLiaisonDashboard';
@@ -23,6 +23,7 @@ const LiaisonDashboard = () => {
   const {
     availableJobs,
     assignedJobs,
+    completedJobs,
     isLoading,
     acceptJob,
     startDelivery,
@@ -143,6 +144,10 @@ const LiaisonDashboard = () => {
             <TabsTrigger value="available">
               <MapPin className="h-4 w-4 mr-2" />
               Available Jobs ({availableJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="completed">
+              <History className="h-4 w-4 mr-2" />
+              Completed Jobs ({completedJobs?.length || 0})
             </TabsTrigger>
           </TabsList>
           
@@ -425,6 +430,124 @@ const LiaisonDashboard = () => {
                         {liaisonProfile && liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs ? 
                           "At Capacity" : "Accept Job"}
                       </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="completed">
+            <div className="grid grid-cols-1 gap-4">
+              {isLoading ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex justify-center">
+                      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : !completedJobs || completedJobs.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center text-gray-500">
+                      <CheckCircle className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                      <p>You don't have any completed jobs yet.</p>
+                      <p className="text-sm mt-2">Completed deliveries and pickups will appear here.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                completedJobs.map((job) => (
+                  <Card key={job.id} className="relative border-l-4 border-l-green-500">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center">
+                          {getJobTypeIcon(job.jobType)}
+                          <CardTitle className="text-lg ml-2">
+                            {job.jobType === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
+                          </CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-200">Completed</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="flex items-start">
+                          <User className="h-5 w-5 text-gray-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">Customer</div>
+                            <div className="text-sm text-gray-500">
+                              {job.userName || 'Unknown Customer'}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start">
+                          <MapPin className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">
+                              {job.jobType === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {job.jobType === 'delivery' 
+                                ? job.startZoneName || 'Unknown Zone'
+                                : job.endZoneName || 'Unknown Zone'}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start">
+                          <Clock className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
+                          <div>
+                            <div className="font-medium">Completed on</div>
+                            <div className="text-sm text-gray-500">
+                              {job.completedAt ? new Date(job.completedAt).toLocaleString() : 'Date not available'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end space-x-2 pt-0">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">Details</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{job.jobType === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
+                            <DialogDescription>
+                              Completed job information
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 mt-4">
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Customer Information</h4>
+                              <div className="text-sm">
+                                <p><span className="font-medium">Name:</span> {job.userName || 'Unknown'}</p>
+                                <p><span className="font-medium">Phone:</span> {job.userPhone || 'Not provided'}</p>
+                                <p><span className="font-medium">Email:</span> {job.userEmail || 'Not provided'}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Location Information</h4>
+                              <div className="text-sm">
+                                <p><span className="font-medium">Start Zone:</span> {job.startZoneName || 'Unknown'}</p>
+                                <p><span className="font-medium">End Zone:</span> {job.endZoneName || 'Unknown'}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Timing</h4>
+                              <div className="text-sm">
+                                <p><span className="font-medium">Assigned:</span> {job.assignedAt ? new Date(job.assignedAt).toLocaleString() : 'Unknown'}</p>
+                                <p><span className="font-medium">Completed:</span> {job.completedAt ? new Date(job.completedAt).toLocaleString() : 'Unknown'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </CardFooter>
                   </Card>
                 ))

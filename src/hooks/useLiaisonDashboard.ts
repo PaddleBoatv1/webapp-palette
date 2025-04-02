@@ -1,653 +1,676 @@
+
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import { Database } from '@/integrations/supabase/types';
 
-// Define refined types based on actual Supabase return types
-interface LiaisonProfile {
+interface Job {
   id: string;
-  user_id: string;
-  is_active: boolean;
-  current_job_count: number;
-  max_concurrent_jobs: number;
-}
-
-interface User {
-  id: string;
-  email: string;
-  full_name?: string | null;
-  phone_number?: string | null;
-}
-
-interface Zone {
-  id: string;
-  zone_name: string;
-  coordinates: any;
-}
-
-interface Reservation {
-  id: string;
-  user_id: string;
-  status: string;
-  start_zone_id?: string | null;
-  end_zone_id?: string | null;
-  user?: User | null;
-  start_zone?: Zone | null;
-  end_zone?: Zone | null;
-}
-
-interface DeliveryJob {
-  id: string;
-  reservation_id: string;
-  status: string;
-  job_type: string;
-  liaison_id?: string | null;
-  assigned_at?: string | null;
-  completed_at?: string | null;
-  reservation?: Reservation | null;
-}
-
-// Interface for formatted job data
-interface FormattedJob {
-  id: string;
-  status: string;
-  jobType: string;
-  assignedAt: string;
-  completedAt: string;
-  userId: string;
-  userEmail: string;
-  userName: string;
-  userPhone: string;
-  startZoneId: string;
-  startZoneName: string;
-  startZoneCoordinates: any;
-  endZoneId: string;
-  endZoneName: string;
-  endZoneCoordinates: any;
   reservationId: string;
-  reservationStatus: string;
+  jobType: string;
+  status: string;
+  assignedAt?: string;
+  completedAt?: string;
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  startZoneName?: string;
+  endZoneName?: string;
 }
 
-// Type for the response from assign_delivery_job RPC function
 interface AssignJobResponse {
   success: boolean;
-  message: string;
+  message?: string;
 }
 
-export const useLiaisonDashboard = () => {
+export function useLiaisonDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [liaisonId, setLiaisonId] = useState<string | null>(null);
 
-  // Get current liaison profile
-  const { data: liaisonProfile, isLoading: isLoadingProfile } = useQuery({
-    queryKey: ['liaisonProfile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
+  useEffect(() => {
+    if (user?.id) {
+      fetchLiaisonId();
+    }
+  }, [user?.id]);
 
+  const fetchLiaisonId = async () => {
+    try {
       const { data, error } = await supabase
         .from('company_liaisons')
         .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user?.id);
 
+      if (error) {
+        console.error('Error fetching liaison id:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setLiaisonId(data[0].id);
+      }
+    } catch (error) {
+      console.error('Exception fetching liaison id:', error);
+    }
+  };
+
+  // Query to fetch liaison profile
+  const { data: liaisonProfile } = useQuery({
+    queryKey: ['liaison', 'profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('company_liaisons')
+        .select('*')
+        .eq('user_id', user?.id);
+        
       if (error) {
         console.error('Error fetching liaison profile:', error);
         throw error;
       }
-
-      return data as LiaisonProfile;
+      
+      return data && data.length > 0 ? data[0] : null;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id
   });
 
-  // Get available jobs
-  const { data: availableJobs, isLoading: isLoadingAvailableJobs } = useQuery({
-    queryKey: ['availableJobs'],
+  // Query to fetch available jobs
+  const { 
+    data: availableJobsRaw, 
+    isLoading: isLoadingAvailable,
+    refetch: refetchAvailableJobs
+  } = useQuery({
+    queryKey: ['liaison', 'availableJobs'],
     queryFn: async () => {
-      if (!liaisonProfile) return [];
-
       const { data, error } = await supabase
         .from('delivery_jobs')
         .select(`
           *,
-          reservation:reservation_id (
+          reservation:reservation_id(
             id,
             user_id,
             status,
             start_zone_id,
             end_zone_id,
-            user:user_id (
-              id,
-              email,
-              full_name,
-              phone_number
-            ),
-            start_zone:start_zone_id (
-              id,
-              zone_name,
-              coordinates
-            ),
-            end_zone:end_zone_id (
-              id,
-              zone_name,
-              coordinates
-            )
+            user:user_id(id, email, full_name, phone_number),
+            start_zone:start_zone_id(id, zone_name, coordinates),
+            end_zone:end_zone_id(id, zone_name, coordinates)
           )
         `)
         .eq('status', 'available');
-
+        
       if (error) {
         console.error('Error fetching available jobs:', error);
         throw error;
       }
-
-      console.log('Available jobs fetched:', data.length);
-      return data as unknown as DeliveryJob[];
+      
+      console.log('Available jobs fetched:', data ? data.length : 0);
+      return data || [];
     },
-    enabled: !!liaisonProfile,
+    refetchInterval: 30000 // Refetch every 30 seconds
   });
-
-  // Get assigned jobs for this liaison - MODIFIED to include both 'assigned' and 'in_progress' statuses
-  const { data: assignedJobs, isLoading: isLoadingAssignedJobs } = useQuery({
-    queryKey: ['assignedJobs', liaisonProfile?.id],
+  
+  // Query to fetch assigned jobs
+  const { 
+    data: assignedJobsRaw, 
+    isLoading: isLoadingAssigned,
+    refetch: refetchAssignedJobs
+  } = useQuery({
+    queryKey: ['liaison', 'assignedJobs', liaisonId],
     queryFn: async () => {
-      if (!liaisonProfile) return [];
-
+      if (!liaisonId) return [];
+      
       const { data, error } = await supabase
         .from('delivery_jobs')
         .select(`
           *,
-          reservation:reservation_id (
+          reservation:reservation_id(
             id,
             user_id,
             status,
             start_zone_id,
             end_zone_id,
-            user:user_id (
-              id,
-              email,
-              full_name,
-              phone_number
-            ),
-            start_zone:start_zone_id (
-              id,
-              zone_name,
-              coordinates
-            ),
-            end_zone:end_zone_id (
-              id,
-              zone_name,
-              coordinates
-            )
+            user:user_id(id, email, full_name, phone_number),
+            start_zone:start_zone_id(id, zone_name, coordinates),
+            end_zone:end_zone_id(id, zone_name, coordinates)
           )
         `)
-        .eq('liaison_id', liaisonProfile.id)
-        .in('status', ['assigned', 'in_progress']); // Changed to include both statuses
-
+        .eq('liaison_id', liaisonId)
+        .in('status', ['assigned', 'in_progress']);
+        
       if (error) {
         console.error('Error fetching assigned jobs:', error);
         throw error;
       }
-
-      console.log('Assigned jobs fetched:', data.length);
-      return data as unknown as DeliveryJob[];
+      
+      console.log('Assigned jobs fetched:', data ? data.length : 0);
+      return data || [];
     },
-    enabled: !!liaisonProfile?.id,
+    enabled: !!liaisonId,
+    refetchInterval: 15000 // Refetch every 15 seconds
   });
 
-  // Accept a job
-  const acceptJobMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      if (!liaisonProfile || !liaisonProfile.id) {
-        throw new Error('No liaison profile found');
+  // Query to fetch completed jobs
+  const { 
+    data: completedJobsRaw, 
+    isLoading: isLoadingCompleted,
+    refetch: refetchCompletedJobs
+  } = useQuery({
+    queryKey: ['liaison', 'completedJobs', liaisonId],
+    queryFn: async () => {
+      if (!liaisonId) return [];
+      
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .select(`
+          *,
+          reservation:reservation_id(
+            id,
+            user_id,
+            status,
+            start_zone_id,
+            end_zone_id,
+            user:user_id(id, email, full_name, phone_number),
+            start_zone:start_zone_id(id, zone_name, coordinates),
+            end_zone:end_zone_id(id, zone_name, coordinates)
+          )
+        `)
+        .eq('liaison_id', liaisonId)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
+        .limit(20); // Limit to the most recent 20 completed jobs
+        
+      if (error) {
+        console.error('Error fetching completed jobs:', error);
+        throw error;
       }
+      
+      console.log('Completed jobs fetched:', data ? data.length : 0);
+      return data || [];
+    },
+    enabled: !!liaisonId,
+    refetchInterval: 60000 // Refetch every minute
+  });
 
-      console.log(`Accepting job: ${jobId}`);
-      console.log(`Accepting job ${jobId} for liaison ${liaisonProfile.id}`);
+  // Transform raw job data
+  const transformJobData = (jobsRaw: any[]): Job[] => {
+    return jobsRaw.map(job => ({
+      id: job.id,
+      reservationId: job.reservation_id,
+      jobType: job.job_type,
+      status: job.status,
+      assignedAt: job.assigned_at,
+      completedAt: job.completed_at,
+      userName: job.reservation?.user?.[0]?.full_name || 'Unknown',
+      userEmail: job.reservation?.user?.[0]?.email,
+      userPhone: job.reservation?.user?.[0]?.phone_number,
+      startZoneName: job.reservation?.start_zone?.[0]?.zone_name,
+      endZoneName: job.reservation?.end_zone?.[0]?.zone_name
+    }));
+  };
 
-      // Check job status before attempting to assign
+  // Prepare job lists from raw data
+  const availableJobs = availableJobsRaw ? transformJobData(availableJobsRaw) : [];
+  const assignedJobs = assignedJobsRaw ? transformJobData(assignedJobsRaw) : [];
+  const completedJobs = completedJobsRaw ? transformJobData(completedJobsRaw) : [];
+
+  // Mutation to accept a job
+  const acceptJobMutation = useMutation({
+    mutationFn: async (jobId: string): Promise<AssignJobResponse> => {
+      console.log('Accepting job:', jobId);
+      
+      if (!liaisonId) {
+        throw new Error('Liaison ID not found. Please refresh and try again.');
+      }
+      
+      console.log('Accepting job', jobId, 'for liaison', liaisonId);
+      
+      // First, fetch details about the job to check if it's still available
       const { data: jobData, error: jobError } = await supabase
         .from('delivery_jobs')
         .select('id, reservation_id, job_type, status')
-        .eq('id', jobId)
-        .single();
-
+        .eq('id', jobId);
+        
       if (jobError) {
         console.error('Error fetching job details:', jobError);
-        throw new Error('Job not found');
-      }
-
-      if (jobData.status !== 'available') {
-        throw new Error('This job is no longer available');
-      }
-
-      console.log('Job data:', jobData); // Debug log to see the job data structure
-
-      // Check liaison capacity
-      if (liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs) {
-        throw new Error('You have reached your maximum job capacity');
-      }
-
-      // Check if the reservation_id is valid
-      if (!jobData.reservation_id) {
-        console.error('Job has no reservation_id, cannot proceed with assignment');
-        throw new Error('Invalid job data: missing reservation ID');
+        throw new Error('Could not fetch job details');
       }
       
-      console.log('Checking for existing jobs for reservation:', jobData.reservation_id);
+      if (!jobData || jobData.length === 0) {
+        throw new Error('Job not found or already taken');
+      }
       
-      // Check if the liaison is already assigned to another job for the same reservation
+      console.log('Job data:', jobData[0]);
+      
+      // Check if the liaison already has a job for this reservation
+      // We don't want to increment the job count in this case
+      console.log('Checking for existing jobs for reservation:', jobData[0].reservation_id);
       const { data: existingJobs, error: existingJobsError } = await supabase
         .from('delivery_jobs')
         .select('id, job_type')
-        .eq('reservation_id', jobData.reservation_id)
-        .eq('liaison_id', liaisonProfile.id);
-
+        .eq('reservation_id', jobData[0].reservation_id)
+        .eq('liaison_id', liaisonId);
+        
       if (existingJobsError) {
-        console.error('Error checking existing jobs:', existingJobsError);
+        console.error('Error checking for existing jobs:', existingJobsError);
+      } else {
+        console.log('Existing jobs for this reservation:', existingJobs);
       }
       
-      console.log('Existing jobs for this reservation:', existingJobs);
+      const hasExistingJobForReservation = existingJobs && existingJobs.length > 0;
       
-      // If the liaison already has a job for this reservation, don't increment the count
-      // BUT still update the job status to 'assigned'
-      if (existingJobs && existingJobs.length > 0) {
-        console.log('Liaison already has a job for this reservation, not incrementing count');
-        
-        // Try direct update first
-        const { data, error } = await supabase
-          .from('delivery_jobs')
-          .update({ 
-            liaison_id: liaisonProfile.id,
-            status: 'assigned',
-            assigned_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId)
-          .select();
-          
-        if (error) {
-          console.error('Error updating job without incrementing count:', error);
-          // Don't throw yet, we'll try the RPC function
-        } else if (data && data.length > 0) {
-          console.log('Job assigned successfully without incrementing count:', data);
-          return { success: true, message: 'Job assigned successfully' };
-        }
-        
-        // If direct update didn't work or returned no data, try the RPC function
-        console.log('Attempting assignment via RPC function...');
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('update_delivery_job_assignment', {
-            job_id: jobId,
-            liaison_id: liaisonProfile.id
-          });
-          
-        if (rpcError) {
-          console.error('Error in RPC assignment:', rpcError);
-          throw new Error(rpcError.message || 'Failed to update job');
-        }
-        
-        // Verify the assignment worked by checking the job again
-        const { data: verifyData, error: verifyError } = await supabase
-          .from('delivery_jobs')
-          .select('*')
-          .eq('id', jobId)
-          .single();
+      // Assign the job directly
+      if (!hasExistingJobForReservation) {
+        try {
+          // Update the job with the liaison ID and change status to 'assigned'
+          const { data, error } = await supabase
+            .from('delivery_jobs')
+            .update({
+              liaison_id: liaisonId,
+              status: 'assigned',
+              assigned_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId)
+            .eq('status', 'available') // Ensure job is still available
+            .select('*');
             
-        if (verifyError) {
-          console.error('Error verifying job after RPC update:', verifyError);
-        } else {
-          console.log('Job status after RPC update:', verifyData);
+          if (error) {
+            console.error('Error updating job:', error);
+            // Don't throw yet, we'll try the RPC function
+          } else if (data && data.length > 0) {
+            console.log('Job assigned successfully:', data);
+            return { success: true, message: 'Job assigned successfully' };
+          }
+        } catch (updateError) {
+          console.error('Exception updating job:', updateError);
+          // Continue to fallback
         }
-        
-        return { success: true, message: 'Job assigned successfully via RPC' };
+      } else {
+        // If liaison already has a job for this reservation, just update without incrementing count
+        try {
+          // Update the job without incrementing the count
+          const { data, error } = await supabase
+            .from('delivery_jobs')
+            .update({
+              liaison_id: liaisonId,
+              status: 'assigned',
+              assigned_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId)
+            .select('*');
+            
+          if (error) {
+            console.error('Error updating job without incrementing count:', error);
+            // Don't throw yet, we'll try the RPC function
+          } else if (data && data.length > 0) {
+            console.log('Job assigned successfully without incrementing count:', data);
+            return { success: true, message: 'Job assigned successfully' };
+          }
+        } catch (updateError) {
+          console.error('Exception updating job without incrementing count:', updateError);
+          // Continue to fallback
+        }
       }
-
-      // For new reservations, use the database function to safely assign the job
-      const { data, error } = await supabase
-        .rpc('assign_delivery_job', {
-          job_id: jobId,
-          assign_to_liaison_id: liaisonProfile.id
-        });
-
+      
+      // If the direct update failed, use the update_delivery_job_assignment RPC as a fallback
+      console.log('Using RPC fallback for job assignment');
+      const { data, error } = await supabase.rpc('update_delivery_job_assignment', {
+        job_id: jobId,
+        liaison_id: liaisonId
+      });
+      
       if (error) {
-        console.error('Error in acceptJobMutation:', error);
-        throw new Error(error.message || 'Failed to update job');
+        console.error('Error assigning job with RPC:', error);
+        throw new Error(error.message || 'Failed to assign job');
       }
-
-      // Handle the response from the RPC function
-      return data as AssignJobResponse;
+      
+      // Verify the assignment worked by fetching the job again
+      const { data: verifyJob } = await supabase
+        .from('delivery_jobs')
+        .select('*')
+        .eq('id', jobId);
+        
+      if (!verifyJob || verifyJob.length === 0 || verifyJob[0].liaison_id !== liaisonId) {
+        console.error('Job assignment verification failed');
+        throw new Error('Job assignment could not be verified');
+      }
+      
+      console.log('Job assigned successfully via RPC method:', verifyJob);
+      
+      if (!hasExistingJobForReservation) {
+        // Manually increment the liaison's job count
+        const { error: countError } = await supabase
+          .from('company_liaisons')
+          .update({ current_job_count: liaisonProfile?.current_job_count ? liaisonProfile.current_job_count + 1 : 1 })
+          .eq('id', liaisonId);
+          
+        if (countError) {
+          console.error('Error incrementing liaison job count:', countError);
+          // Don't throw, the assignment was successful
+        }
+      }
+      
+      return { success: true, message: 'Job assigned successfully' };
     },
     onSuccess: (_, jobId) => {
       // Update queries
-      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'availableJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'profile'] });
       
       toast({
-        title: 'Job Accepted',
-        description: 'You have successfully accepted this job',
+        title: "Job Accepted",
+        description: "You have successfully accepted the job."
       });
     },
-    onError: (error: any) => {
-      console.error('Error in acceptJobMutation:', error);
+    onError: (error) => {
+      console.error('Error accepting job:', error);
       toast({
-        title: 'Error Accepting Job',
-        description: error.message || 'Something went wrong',
-        variant: 'destructive',
+        title: "Acceptance Failed",
+        description: error instanceof Error ? error.message : "There was an error accepting the job. Please try again.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Start delivery (transition job from assigned to in_progress)
+  // Mutation to start delivery
   const startDeliveryMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      // Only update the job status, don't change the liaison assignment
+      console.log('Starting delivery for job:', jobId);
+      
       const { data, error } = await supabase
         .from('delivery_jobs')
-        .update({ status: 'in_progress' })
+        .update({
+          status: 'in_progress',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', jobId)
-        .eq('liaison_id', liaisonProfile?.id)
-        .select();
-
-      if (error) throw error;
+        .eq('status', 'assigned') // Ensure the job is in assigned status
+        .select('*');
+        
+      if (error) {
+        console.error('Error starting delivery:', error);
+        throw error;
+      }
+      
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'assignedJobs'] });
+      
       toast({
-        title: 'Delivery Started',
-        description: 'You have started the delivery process',
+        title: "Delivery Started",
+        description: "You have started the delivery. Drive safely!"
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      console.error('Error starting delivery:', error);
       toast({
-        title: 'Error Starting Delivery',
-        description: error.message || 'Something went wrong',
-        variant: 'destructive',
+        title: "Start Failed",
+        description: "There was an error starting the delivery. Please try again.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Complete delivery
+  // Mutation to complete delivery
   const completeDeliveryMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const { data, error } = await supabase
+      console.log('Completing delivery for job:', jobId);
+      
+      // First fetch the delivery job to get the reservation ID
+      const { data: jobData, error: jobError } = await supabase
         .from('delivery_jobs')
-        .update({ 
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        })
+        .select('reservation_id')
         .eq('id', jobId)
-        .eq('liaison_id', liaisonProfile?.id)
-        .select();
-
-      if (error) throw error;
-      
-      // Find the job to get the reservation ID
-      const job = assignedJobs?.find(j => j.id === jobId);
-      
-      if (job && job.reservation) {
-        // If it's a delivery job, set the reservation to in_progress
-        if (job.job_type === 'delivery') {
-          const { error: resError } = await supabase
-            .from('reservations')
-            .update({ status: 'in_progress', start_time: new Date().toISOString() })
-            .eq('id', job.reservation_id);
-            
-          if (resError) throw resError;
-        }
+        .single();
+        
+      if (jobError) {
+        console.error('Error fetching job data:', jobError);
+        throw jobError;
       }
       
-      // REMOVED: Don't decrease the liaison's job count when completing delivery
-      // The job is still assigned to the liaison until pickup is done
-      // This ensures the job still appears in the liaison's assigned jobs
+      // Update the delivery job status
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('status', 'in_progress') // Ensure the job is in progress
+        .select('*');
+        
+      if (error) {
+        console.error('Error completing delivery:', error);
+        throw error;
+      }
+      
+      // Update the reservation status to in_progress
+      const { error: reservationError } = await supabase
+        .from('reservations')
+        .update({
+          status: 'in_progress',
+          start_time: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobData.reservation_id);
+        
+      if (reservationError) {
+        console.error('Error updating reservation status:', reservationError);
+        throw reservationError;
+      }
       
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      // Don't invalidate the liaisonProfile as we're keeping the job count the same
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'completedJobs'] });
+      
       toast({
-        title: 'Delivery Completed',
-        description: 'You have successfully delivered the boat to the customer. The customer can now use the boat. You will be assigned to pick up when the customer ends their trip.',
+        title: "Delivery Completed",
+        description: "You have successfully completed the delivery."
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      console.error('Error completing delivery:', error);
       toast({
-        title: 'Error Completing Delivery',
-        description: error.message || 'Something went wrong',
-        variant: 'destructive',
+        title: "Completion Failed",
+        description: "There was an error completing the delivery. Please try again.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Start pickup
+  // Mutation to start pickup
   const startPickupMutation = useMutation({
     mutationFn: async (jobId: string) => {
+      console.log('Starting pickup for job:', jobId);
+      
       const { data, error } = await supabase
         .from('delivery_jobs')
-        .update({ status: 'in_progress' })
+        .update({
+          status: 'in_progress',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', jobId)
-        .eq('liaison_id', liaisonProfile?.id)
-        .select();
-
-      if (error) throw error;
+        .eq('status', 'assigned') // Ensure the job is in assigned status
+        .select('*');
+        
+      if (error) {
+        console.error('Error starting pickup:', error);
+        throw error;
+      }
+      
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'assignedJobs'] });
+      
       toast({
-        title: 'Pickup Started',
-        description: 'You have started the pickup process',
+        title: "Pickup Started",
+        description: "You have started the boat pickup. Drive safely!"
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      console.error('Error starting pickup:', error);
       toast({
-        title: 'Error Starting Pickup',
-        description: error.message || 'Something went wrong',
-        variant: 'destructive',
+        title: "Start Failed",
+        description: "There was an error starting the pickup. Please try again.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Complete pickup
+  // Mutation to complete pickup
   const completePickupMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const { data, error } = await supabase
-        .from('delivery_jobs')
-        .update({ 
-          status: 'completed',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', jobId)
-        .eq('liaison_id', liaisonProfile?.id)
-        .select();
-
-      if (error) throw error;
+      console.log('Completing pickup for job:', jobId);
       
-      // Also update the reservation status to completed
-      const job = assignedJobs?.find(j => j.id === jobId);
-      if (job && job.reservation) {
-        // Update boat status to available for new rentals
-        const { data: reservationData, error: resQueryError } = await supabase
-          .from('reservations')
-          .select('boat_id')
-          .eq('id', job.reservation_id)
-          .single();
-          
-        if (resQueryError) throw resQueryError;
+      // First fetch the pickup job to get the reservation ID
+      const { data: jobData, error: jobError } = await supabase
+        .from('delivery_jobs')
+        .select('reservation_id')
+        .eq('id', jobId)
+        .single();
         
-        if (reservationData.boat_id) {
-          // Update the boat status to available
-          const { error: boatError } = await supabase
-            .from('boats')
-            .update({ status: 'available' })
-            .eq('id', reservationData.boat_id);
-            
-          if (boatError) throw boatError;
-        }
-        
-        const { error: resError } = await supabase
-          .from('reservations')
-          .update({ 
-            status: 'completed',
-            end_time: new Date().toISOString()
-          })
-          .eq('id', job.reservation_id);
-          
-        if (resError) throw resError;
+      if (jobError) {
+        console.error('Error fetching job data:', jobError);
+        throw jobError;
       }
       
-      // Now decrease the liaison's job count since a completed pickup fully completes the job cycle
-      if (liaisonProfile?.id) {
-        const { error: liaisionError } = await supabase
-          .from('company_liaisons')
-          .update({ 
-            current_job_count: Math.max(0, (liaisonProfile.current_job_count - 1))
-          })
-          .eq('id', liaisonProfile.id);
-          
-        if (liaisionError) {
-          console.error('Error updating liaison capacity:', liaisionError);
-          // We don't want to throw here, as the primary operation succeeded
-        }
+      // Update the pickup job status
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('status', 'in_progress') // Ensure the job is in progress
+        .select('*');
+        
+      if (error) {
+        console.error('Error completing pickup:', error);
+        throw error;
+      }
+      
+      // Update the reservation status to completed
+      const { error: reservationError } = await supabase
+        .from('reservations')
+        .update({
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobData.reservation_id);
+        
+      if (reservationError) {
+        console.error('Error updating reservation status:', reservationError);
+        throw reservationError;
       }
       
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'completedJobs'] });
+      
       toast({
-        title: 'Pickup Completed',
-        description: 'You have completed the pickup. The boat is now available for new rentals.',
+        title: "Pickup Completed",
+        description: "You have successfully completed the boat pickup."
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      console.error('Error completing pickup:', error);
       toast({
-        title: 'Error Completing Pickup',
-        description: error.message || 'Something went wrong',
-        variant: 'destructive',
+        title: "Completion Failed",
+        description: "There was an error completing the pickup. Please try again.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Resign from a job
+  // Mutation to resign from a job
   const resignJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
+      console.log('Resigning from job:', jobId);
+      
       const { data, error } = await supabase
         .from('delivery_jobs')
-        .update({ 
-          status: 'available',
+        .update({
           liaison_id: null,
-          assigned_at: null 
+          status: 'available',
+          assigned_at: null,
+          updated_at: new Date().toISOString()
         })
         .eq('id', jobId)
-        .eq('liaison_id', liaisonProfile?.id)
-        .select();
-
-      if (error) throw error;
+        .in('status', ['assigned']) // Can only resign from assigned jobs, not in-progress
+        .select('*');
+        
+      if (error) {
+        console.error('Error resigning from job:', error);
+        throw error;
+      }
       
-      // Manually decrease the liaison's job count since resigning from a job frees up capacity
-      if (liaisonProfile?.id) {
-        const { error: liaisionError } = await supabase
+      // Decrement the liaison's job count
+      if (liaisonId) {
+        const { error: countError } = await supabase
           .from('company_liaisons')
           .update({ 
-            current_job_count: Math.max(0, (liaisonProfile.current_job_count - 1))
+            current_job_count: Math.max((liaisonProfile?.current_job_count || 1) - 1, 0) 
           })
-          .eq('id', liaisonProfile.id);
+          .eq('id', liaisonId);
           
-        if (liaisionError) {
-          console.error('Error updating liaison capacity:', liaisionError);
-          // We don't want to throw here, as the primary operation succeeded
+        if (countError) {
+          console.error('Error decrementing liaison job count:', countError);
+          // Don't throw, the resignation was successful
         }
       }
       
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'availableJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['liaison', 'profile'] });
+      
       toast({
-        title: 'Job Resigned',
-        description: 'You have resigned from this job',
+        title: "Job Resigned",
+        description: "You have resigned from the job."
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      console.error('Error resigning from job:', error);
       toast({
-        title: 'Error Resigning Job',
-        description: error.message || 'Something went wrong',
-        variant: 'destructive',
+        title: "Resignation Failed",
+        description: "There was an error resigning from the job. Please try again.",
+        variant: "destructive"
       });
-    },
+    }
   });
 
-  // Format job data for display with proper fallbacks to prevent type errors
-  const formatJobsForDisplay = useCallback((jobs: DeliveryJob[]): FormattedJob[] => {
-    return jobs.map(job => {
-      const reservation = job.reservation || {} as Reservation;
-      const user = reservation.user || {} as User;
-      const start_zone = reservation.start_zone || {} as Zone;
-      const end_zone = reservation.end_zone || {} as Zone;
-      
-      return {
-        id: job.id,
-        status: job.status,
-        jobType: job.job_type,
-        assignedAt: job.assigned_at || '',
-        completedAt: job.completed_at || '',
-        
-        // User information with fallbacks
-        userId: reservation.user_id || '',
-        userEmail: user.email || '',
-        userName: user.full_name || '',
-        userPhone: user.phone_number || '',
-        
-        // Location information with fallbacks
-        startZoneId: reservation.start_zone_id || '',
-        startZoneName: start_zone.zone_name || '',
-        startZoneCoordinates: start_zone.coordinates || null,
-        
-        endZoneId: reservation.end_zone_id || '',
-        endZoneName: end_zone.zone_name || '',
-        endZoneCoordinates: end_zone.coordinates || null,
-        
-        reservationId: job.reservation_id,
-        reservationStatus: reservation.status || '',
-      };
-    });
-  }, []);
+  // Combine loading states
+  const isLoading = isLoadingAvailable || isLoadingAssigned || isLoadingCompleted;
 
+  // Expose the necessary data and functions
   return {
+    availableJobs,
+    assignedJobs,
+    completedJobs,
     liaisonProfile,
-    isLoadingProfile,
-    availableJobs: formatJobsForDisplay(availableJobs || []),
-    isLoadingAvailableJobs,
-    assignedJobs: formatJobsForDisplay(assignedJobs || []),
-    isLoadingAssignedJobs,
-    isLoading: isLoadingProfile || isLoadingAvailableJobs || isLoadingAssignedJobs,
-    
-    // Job management functions
-    acceptJob: (jobId: string) => acceptJobMutation.mutate(jobId),
-    isAcceptingJob: acceptJobMutation.isPending,
-    
-    startDelivery: (jobId: string) => startDeliveryMutation.mutate(jobId),
-    isStartingDelivery: startDeliveryMutation.isPending,
-    
-    completeDelivery: (jobId: string) => completeDeliveryMutation.mutate(jobId),
-    isCompletingDelivery: completeDeliveryMutation.isPending,
-    
-    startPickup: (jobId: string) => startPickupMutation.mutate(jobId),
-    isStartingPickup: startPickupMutation.isPending,
-    
-    completePickup: (jobId: string) => completePickupMutation.mutate(jobId),
-    isCompletingPickup: completePickupMutation.isPending,
-    
-    resignJob: (jobId: string) => resignJobMutation.mutate(jobId),
-    isResigningJob: resignJobMutation.isPending,
+    isLoading,
+    acceptJob: acceptJobMutation.mutate,
+    startDelivery: startDeliveryMutation.mutate,
+    completeDelivery: completeDeliveryMutation.mutate,
+    startPickup: startPickupMutation.mutate,
+    completePickup: completePickupMutation.mutate,
+    resignJob: resignJobMutation.mutate
   };
-};
+}

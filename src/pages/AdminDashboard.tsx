@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -53,7 +52,6 @@ const AdminDashboard = () => {
   const [isAddBoatDialogOpen, setIsAddBoatDialogOpen] = useState(false);
 
   useEffect(() => {
-    // Log user info for debugging
     console.log("Admin Dashboard - Current user:", user);
   }, [user]);
 
@@ -86,19 +84,16 @@ const AdminDashboard = () => {
     }
   };
 
-  // Filter reservations by search term
   const filteredReservations = reservations?.filter(reservation => {
-    // Search by reservation ID or user email/name
     return (
       reservation.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reservation.users?.[0]?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       reservation.users?.[0]?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Bar */}
       <header className="bg-white shadow">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
@@ -124,7 +119,6 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Admin Dashboard</h2>
@@ -138,7 +132,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Dashboard Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-2">
@@ -177,7 +170,6 @@ const AdminDashboard = () => {
           </Card>
         </div>
         
-        {/* Tabs for different admin functions */}
         <Tabs defaultValue="reservations">
           <TabsList className="mb-6">
             <TabsTrigger value="reservations">
@@ -308,24 +300,17 @@ const AdminDashboard = () => {
                                 )}
 
                                 {reservation.status === 'confirmed' && (
-                                  <Select onValueChange={(value) => assignLiaison(reservation.id, value)}>
-                                    <SelectTrigger className="h-8 w-24">
-                                      <SelectValue placeholder="Liaison" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectGroup>
-                                        {!isLoadingLiaisons && availableLiaisons && availableLiaisons.length > 0 ? (
-                                          availableLiaisons.map((liaison: any) => (
-                                            <SelectItem key={liaison.id} value={liaison.id}>
-                                              {liaison.users[0]?.full_name || liaison.users[0]?.email} ({liaison.current_job_count}/{liaison.max_concurrent_jobs})
-                                            </SelectItem>
-                                          ))
-                                        ) : (
-                                          <SelectItem value="none" disabled>No liaisons available</SelectItem>
-                                        )}
-                                      </SelectGroup>
-                                    </SelectContent>
-                                  </Select>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => assignLiaisonMutation.mutate({ 
+                                      reservationId: reservation.id, 
+                                      liaisonId: availableLiaisons?.[0]?.id 
+                                    })}
+                                  >
+                                    <Truck className="h-4 w-4 mr-1" />
+                                    Assign Delivery
+                                  </Button>
                                 )}
                               </div>
                             </TableCell>
@@ -381,10 +366,10 @@ const AdminDashboard = () => {
                         
                         <div className="flex flex-col gap-3 mt-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-1/2">
+                            <div className="w-2/3">
                               <Select onValueChange={(value) => assignBoat(reservation.id, value)}>
                                 <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Assign a boat" />
+                                  <SelectValue placeholder="Select a boat to confirm" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectGroup>
@@ -402,48 +387,7 @@ const AdminDashboard = () => {
                               </Select>
                             </div>
                             
-                            <div className="w-1/2">
-                              <Select onValueChange={(value) => updateStatus(reservation.id, value)}>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Change status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectGroup>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="awaiting_pickup">Awaiting Pickup</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                    <SelectItem value="canceled">Canceled</SelectItem>
-                                  </SelectGroup>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <div className="w-3/4">
-                              <Select onValueChange={(value) => assignLiaison(reservation.id, value)}>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Assign to delivery executive" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectGroup>
-                                    {!isLoadingLiaisons && availableLiaisons && availableLiaisons.length > 0 ? (
-                                      availableLiaisons.map((liaison: any) => (
-                                        <SelectItem key={liaison.id} value={liaison.id}>
-                                          {liaison.users[0]?.full_name || liaison.users[0]?.email} ({liaison.current_job_count}/{liaison.max_concurrent_jobs})
-                                        </SelectItem>
-                                      ))
-                                    ) : (
-                                      <SelectItem value="none" disabled>No liaisons available</SelectItem>
-                                    )}
-                                  </SelectGroup>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            
-                            <div className="w-1/4">
+                            <div className="w-1/3">
                               <Button 
                                 variant="outline" 
                                 size="sm" 
