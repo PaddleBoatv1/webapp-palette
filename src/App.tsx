@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import CreateReservation from "./pages/CreateReservation";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/AuthCallback";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -38,6 +40,28 @@ const ProtectedRoute = ({ element }: { element: React.ReactNode }) => {
   return isAuthenticated ? <>{element}</> : null;
 };
 
+// Admin route - only for users with admin role
+const AdminRoute = ({ element }: { element: React.ReactNode }) => {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || user?.role !== 'admin')) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, navigate, user]);
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+  
+  return (isAuthenticated && user?.role === 'admin') ? <>{element}</> : null;
+};
+
 // Auth routes - redirect to dashboard if already logged in
 const AuthRoute = ({ element }: { element: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -60,6 +84,8 @@ const AppRoutes = () => {
       <Route path="/login" element={<AuthRoute element={<Login />} />} />
       <Route path="/signup" element={<AuthRoute element={<Signup />} />} />
       <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
+      <Route path="/create-reservation" element={<ProtectedRoute element={<CreateReservation />} />} />
+      <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/db-setup" element={<DatabaseSetup />} />
       <Route path="*" element={<NotFound />} />
