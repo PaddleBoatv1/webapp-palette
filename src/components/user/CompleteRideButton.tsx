@@ -16,6 +16,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
   const { data: existingJobs, isLoading } = useQuery({
     queryKey: ['existingPickupJobs', reservationId],
     queryFn: async () => {
+      console.log("Checking for existing pickup jobs for reservation:", reservationId);
       const { data, error } = await supabase
         .from('delivery_jobs')
         .select('*')
@@ -46,7 +47,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
           throw new Error(error.message || "Failed to complete ride");
         }
         
-        // Only create a pickup job if one doesn't already exist
+        // Only create a pickup job if none exist
         if (!existingJobs || existingJobs.length === 0) {
           // Log that we're creating a new pickup job
           console.log("No existing pickup jobs found, creating a new one for reservation:", reservationId);
@@ -69,7 +70,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
             console.warn("Ride marked as complete but pickup job creation failed:", jobError.message);
           }
         } else {
-          console.log("Pickup job already exists, not creating a duplicate");
+          console.log(`${existingJobs.length} pickup job(s) already exist, not creating a duplicate`);
         }
         
         return { success: true };

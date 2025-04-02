@@ -211,7 +211,7 @@ export const useLiaisonDashboard = () => {
       // Check job status before attempting to assign
       const { data: jobData, error: jobError } = await supabase
         .from('delivery_jobs')
-        .select('*')
+        .select('id, reservation_id, job_type, status')
         .eq('id', jobId)
         .single();
 
