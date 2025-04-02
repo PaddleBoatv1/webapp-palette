@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -12,7 +12,6 @@ interface CompleteRideButtonProps {
 export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservationId }) => {
   const queryClient = useQueryClient();
   
-  // We no longer need to check for existing pickup jobs since we'll rely on the trigger
   const completeRideMutation = useMutation({
     mutationFn: async () => {
       try {

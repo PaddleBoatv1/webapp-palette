@@ -253,10 +253,11 @@ export const useLiaisonDashboard = () => {
       console.log('Existing jobs for this reservation:', existingJobs);
       
       // If the liaison already has a job for this reservation, don't increment the count
+      // BUT still update the job status to 'assigned'
       if (existingJobs && existingJobs.length > 0) {
         console.log('Liaison already has a job for this reservation, not incrementing count');
         
-        // Just update the job status without increasing the count
+        // Update the job status to assigned without increasing the count
         const { data, error } = await supabase
           .from('delivery_jobs')
           .update({ 
