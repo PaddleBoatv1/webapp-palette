@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -10,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Trash, Plus, MapPin } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ZoneManagerProps {
   zones: Zone[];
@@ -22,6 +24,7 @@ const getCoordinates = (coordinates: any) => {
     return { lat: 0, lng: 0 };
   }
   
+  // Handle string format
   if (typeof coordinates === 'string') {
     try {
       return JSON.parse(coordinates);
@@ -31,12 +34,27 @@ const getCoordinates = (coordinates: any) => {
     }
   }
   
-  // If already an object with lat/lng properties
-  if (coordinates.lat !== undefined && coordinates.lng !== undefined) {
-    return coordinates;
+  // Handle object format
+  if (typeof coordinates === 'object') {
+    if (coordinates.lat !== undefined && coordinates.lng !== undefined) {
+      return { 
+        lat: parseFloat(coordinates.lat), 
+        lng: parseFloat(coordinates.lng) 
+      };
+    }
   }
   
   return { lat: 0, lng: 0 };
+};
+
+// Format coordinates safely for display
+const formatCoordinate = (value: any): string => {
+  if (value === undefined || value === null) {
+    return "0.0000";
+  }
+  
+  const num = parseFloat(String(value));
+  return !isNaN(num) ? num.toFixed(4) : "0.0000";
 };
 
 const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
@@ -264,7 +282,7 @@ const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
                 
                 {newZone.coordinates.lat !== 0 && (
                   <div className="text-sm text-muted-foreground">
-                    Selected: {newZone.coordinates.lat.toFixed(6)}, {newZone.coordinates.lng.toFixed(6)}
+                    Selected: {formatCoordinate(newZone.coordinates.lat)}, {formatCoordinate(newZone.coordinates.lng)}
                   </div>
                 )}
               </div>
@@ -299,10 +317,10 @@ const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {isLoading ? (
             Array(3).fill(0).map((_, i) => (
-              <Card key={i} className="animate-pulse">
+              <Card key={i}>
                 <CardContent className="p-6">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-100 rounded w-1/2"></div>
+                  <Skeleton className="h-4 w-3/4 mb-2" />
+                  <Skeleton className="h-3 w-1/2" />
                 </CardContent>
               </Card>
             ))
@@ -337,7 +355,7 @@ const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
                       <MapPin className="h-3 w-3 mr-1" />
                       {coords.lat !== 0 || coords.lng !== 0 ? (
                         <span>
-                          {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+                          {formatCoordinate(coords.lat)}, {formatCoordinate(coords.lng)}
                         </span>
                       ) : (
                         <span>No coordinates set</span>
