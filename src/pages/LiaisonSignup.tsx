@@ -1,172 +1,123 @@
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { toast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Ship, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertCircle, Info, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const LiaisonSignup = () => {
   const navigate = useNavigate();
-  const { signup } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-    phoneNumber: ''
-  });
+  const { loginWithGoogle, isLoading } = useAuth();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
+  const handleGoogleLogin = async () => {
     try {
-      // Register the user
-      const { error, data } = await signup(
-        formData.email, 
-        formData.password,
-        {
-          full_name: formData.fullName,
-          phone_number: formData.phoneNumber,
-          role: 'liaison'  // Set role as liaison
-        }
-      );
+      // Store the liaison registration data in localStorage so we can access it after Google auth callback
+      localStorage.setItem('liaison_registration', JSON.stringify({
+        name,
+        phone,
+        termsAccepted
+      }));
       
-      if (error) throw error;
-      
-      if (data.user) {
-        // Create a liaison record in company_liaisons table
-        const { error: liaisonError } = await supabase
-          .from('company_liaisons')
-          .insert([{ 
-            user_id: data.user.id,
-            is_active: true,
-            current_job_count: 0,
-            max_concurrent_jobs: 3
-          }]);
-        
-        if (liaisonError) throw liaisonError;
-        
-        toast({
-          title: 'Registration successful',
-          description: 'You have been registered as a delivery executive. Please wait for admin approval.',
-        });
-        
-        navigate('/dashboard');
-      }
+      await loginWithGoogle();
+      // The actual registration will happen in the AuthCallback component after successful Google login
     } catch (error: any) {
-      console.error('Error during signup:', error);
-      toast({
-        title: 'Registration failed',
-        description: error.message || 'Something went wrong during signup.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+      setError(error.message || "Failed to login with Google");
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-4">
-        <Card>
-          <CardHeader className="space-y-1">
-            <div className="flex items-center justify-center mb-4">
-              <Ship className="h-12 w-12 text-blue-500" />
-            </div>
-            <CardTitle className="text-2xl text-center">Delivery Executive Signup</CardTitle>
-            <CardDescription className="text-center">
-              Join our team of delivery executives to help deliver and pick up paddleboats
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="example@email.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="********"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    name="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    value={formData.fullName}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input
-                    id="phoneNumber"
-                    name="phoneNumber"
-                    type="tel"
-                    placeholder="+1-234-567-8900"
-                    value={formData.phoneNumber}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing up...
-                    </>
-                  ) : (
-                    "Sign up as Delivery Executive"
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-          <CardFooter>
-            <div className="text-center text-sm text-gray-500 w-full">
-              Already have an account?{' '}
-              <Link to="/login" className="underline text-blue-500">
-                Login
-              </Link>
-            </div>
-          </CardFooter>
-        </Card>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Become a Delivery Executive</CardTitle>
+          <CardDescription className="text-center">
+            Join our team and help deliver paddleboats to customers
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name</Label>
+            <Input 
+              id="name" 
+              placeholder="Enter your full name" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input 
+              id="phone" 
+              placeholder="Enter your phone number" 
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox 
+              id="terms" 
+              checked={termsAccepted} 
+              onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+            />
+            <label
+              htmlFor="terms"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              I agree to the terms and conditions as a delivery executive
+            </label>
+          </div>
+          
+          <Button
+            variant="default"
+            type="button"
+            className="w-full mt-4"
+            disabled={!name || !phone || !termsAccepted || isLoading || isSubmitting}
+            onClick={handleGoogleLogin}
+          >
+            <UserIcon className="mr-2 h-4 w-4" />
+            Continue with Google
+          </Button>
+          
+          <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <Info className="h-4 w-4 text-blue-500" />
+            <AlertDescription className="text-sm text-gray-700">
+              <p className="mb-1">Important notes:</p>
+              <ol className="list-disc list-inside space-y-1 pl-1">
+                <li>You must provide a valid phone number for delivery coordination</li>
+                <li>Our team will verify your information before activating your account</li>
+              </ol>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+        <CardFooter>
+          <div className="text-sm text-center w-full text-gray-500">
+            Already a delivery executive?{" "}
+            <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium">
+              Login
+            </Link>
+          </div>
+        </CardFooter>
+      </Card>
     </div>
   );
 };

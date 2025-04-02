@@ -59,7 +59,56 @@ const AuthCallback: React.FC = () => {
               console.error("Error checking user existence:", userError);
             }
             
-            if (!userData) {
+            // Check for liaison registration data in localStorage
+            const liaisonData = localStorage.getItem('liaison_registration');
+            
+            if (liaisonData) {
+              const { name, phone, termsAccepted } = JSON.parse(liaisonData);
+              
+              if (name && phone && termsAccepted) {
+                // First, create or update the user profile
+                const { error: profileError } = await supabase
+                  .from('users')
+                  .upsert({
+                    id: session.user.id,
+                    email: session.user.email,
+                    full_name: name,
+                    phone_number: phone,
+                    role: 'liaison'
+                  });
+                  
+                if (profileError) {
+                  console.error("Error creating user profile:", profileError);
+                  throw profileError;
+                }
+                
+                // Then, create the liaison record
+                const { error: liaisonError } = await supabase
+                  .from('company_liaisons')
+                  .upsert({
+                    user_id: session.user.id,
+                    is_active: true,
+                    current_job_count: 0
+                  });
+                
+                if (liaisonError) {
+                  console.error("Error creating liaison record:", liaisonError);
+                  throw liaisonError;
+                }
+                
+                // Clear the temporary data
+                localStorage.removeItem('liaison_registration');
+                
+                toast({
+                  title: "Registration Successful",
+                  description: "You have been registered as a delivery executive",
+                });
+                
+                // Redirect to liaison dashboard
+                navigate('/liaison', { replace: true });
+                return;
+              }
+            } else if (!userData) {
               console.log("Creating new user profile");
               // Insert new user profile if it doesn't exist
               const { error: insertError } = await supabase
@@ -108,6 +157,7 @@ const AuthCallback: React.FC = () => {
         
         // Clean up
         sessionStorage.removeItem('auth_hash');
+        localStorage.removeItem('liaison_registration');
         
         // Redirect to login
         setTimeout(() => {
@@ -149,6 +199,7 @@ const AuthCallback: React.FC = () => {
         <button 
           onClick={() => {
             sessionStorage.removeItem('auth_hash');
+            localStorage.removeItem('liaison_registration');
             navigate('/login', { replace: true });
           }} 
           className="ml-1 text-blue-500 hover:underline"
