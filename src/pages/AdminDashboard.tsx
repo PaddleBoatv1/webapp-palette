@@ -13,7 +13,13 @@ import { useAdminDashboard } from '@/hooks/useAdminDashboard';
 const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { boatStats, reservationStats, zoneStats } = useAdminDashboard();
+  const { 
+    boatStats, 
+    reservationStats, 
+    zoneStats, 
+    zones, 
+    isLoadingZones 
+  } = useAdminDashboard();
   
   useEffect(() => {
     // Log user info for debugging
@@ -136,7 +142,7 @@ const AdminDashboard = () => {
           </TabsContent>
           
           <TabsContent value="zones" className="space-y-4">
-            <ZoneManager />
+            <ZoneManager zones={zones || []} isLoading={isLoadingZones} />
           </TabsContent>
           
           <TabsContent value="reservations" className="space-y-4">

@@ -1,7 +1,9 @@
-import { useState } from 'react';
+
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
+import { Zone } from '@/lib/supabase';
 
 export function useAdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -114,6 +116,93 @@ export function useAdminDashboard() {
     refetchOnWindowFocus: false
   });
 
+  // Query to fetch all boats for stats
+  const { 
+    data: allBoats,
+    isLoading: isLoadingAllBoats 
+  } = useQuery({
+    queryKey: ['admin', 'allBoats'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('boats')
+        .select('*');
+        
+      if (error) {
+        console.error('Error fetching all boats:', error);
+        throw error;
+      }
+      
+      return data || [];
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // Query to fetch all zones for stats and management
+  const { 
+    data: zones,
+    isLoading: isLoadingZones
+  } = useQuery({
+    queryKey: ['zones'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('zones')
+        .select('*')
+        .order('zone_name', { ascending: true });
+        
+      if (error) {
+        console.error('Error fetching zones:', error);
+        throw error;
+      }
+      
+      return data || [];
+    }
+  });
+
+  // Compute boat statistics
+  const boatStats = useMemo(() => {
+    const total = allBoats?.length || 0;
+    const available = allBoats?.filter(boat => boat.status === 'available').length || 0;
+    const inUse = allBoats?.filter(boat => boat.status === 'in_use').length || 0;
+    
+    return { total, available, inUse };
+  }, [allBoats]);
+
+  // Compute reservation statistics
+  const reservationStats = useMemo(() => {
+    const active = reservations?.filter(res => res.status === 'in_progress').length || 0;
+    const pending = pendingReservations?.length || 0;
+    const completed = reservations?.filter(res => res.status === 'completed').length || 0;
+    
+    return { active, pending, completed };
+  }, [reservations, pendingReservations]);
+
+  // Compute zone statistics
+  const zoneStats = useMemo(() => {
+    const total = zones?.length || 0;
+    
+    // Find the most popular zone based on reservation count
+    let zoneCounts: Record<string, number> = {};
+    reservations?.forEach(res => {
+      const startZoneId = res.start_zone?.[0]?.id;
+      if (startZoneId) {
+        zoneCounts[startZoneId] = (zoneCounts[startZoneId] || 0) + 1;
+      }
+    });
+    
+    let popularZoneId = '';
+    let maxCount = 0;
+    Object.entries(zoneCounts).forEach(([zoneId, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        popularZoneId = zoneId;
+      }
+    });
+    
+    const popular = zones?.find(z => z.id === popularZoneId)?.zone_name || 'None';
+    
+    return { total, popular };
+  }, [zones, reservations]);
+
   // Mutation to assign boat to reservation
   const assignBoatMutation = useMutation({
     mutationFn: async ({ reservationId, boatId }: { reservationId: string, boatId: string }) => {
@@ -152,6 +241,7 @@ export function useAdminDashboard() {
       queryClient.invalidateQueries({ queryKey: ['admin', 'reservations'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'pendingReservations'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'availableBoats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'allBoats'] });
       
       toast({
         title: "Boat Assigned",
@@ -237,6 +327,8 @@ export function useAdminDashboard() {
     reservations,
     pendingReservations,
     availableBoats,
+    zones,
+    isLoadingZones,
     isLoadingReservations,
     isLoadingBoats,
     isReservationsError,
@@ -244,6 +336,10 @@ export function useAdminDashboard() {
     statusFilter,
     setStatusFilter,
     assignBoatMutation,
-    updateReservationStatusMutation
+    updateReservationStatusMutation,
+    // Add the computed statistics
+    boatStats,
+    reservationStats,
+    zoneStats
   };
 }
