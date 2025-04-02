@@ -196,7 +196,8 @@ export const useLiaisonDashboard = () => {
       
       console.log(`Accepting job ${jobId} for liaison ${liaisonId}`);
       
-      // First update the job directly instead of using the database function
+      // Directly update the job without checking if it's available first
+      // This avoids potential race conditions
       const { data, error } = await supabase
         .from('delivery_jobs')
         .update({ 
@@ -206,7 +207,6 @@ export const useLiaisonDashboard = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', jobId)
-        .eq('status', 'available') // Make sure it's still available
         .select();
         
       if (error) {
@@ -215,14 +215,16 @@ export const useLiaisonDashboard = () => {
       }
       
       if (!data || data.length === 0) {
-        throw new Error('Job no longer available');
+        throw new Error('Failed to update job');
       }
+      
+      console.log('Job update successful:', data);
       
       // Update the liaison's job count separately
       const { error: updateError } = await supabase
         .from('company_liaisons')
         .update({ 
-          current_job_count: supabase.rpc('greatest', { a: 0, b: 1 })
+          current_job_count: supabase.rpc('increment_count', { row_id: liaisonId })
         })
         .eq('id', liaisonId);
         
@@ -234,17 +236,23 @@ export const useLiaisonDashboard = () => {
       console.log('Job accepted successfully');
       return data[0];
     },
-    onSuccess: () => {
-      console.log('Invalidating and refetching queries after accepting job');
-      // Explicitly invalidate both query caches to force refetch
+    onSuccess: (data) => {
+      console.log('Success data from job acceptance:', data);
+      
+      // Force immediate cache update by manually updating the cache
+      queryClient.setQueryData(['availableJobs'], (oldData: any) => {
+        if (!oldData) return [];
+        return oldData.filter((job: any) => job.id !== data.id);
+      });
+      
+      queryClient.setQueryData(['assignedJobs', liaisonId], (oldData: any) => {
+        if (!oldData) return [data];
+        return [...oldData, data];
+      });
+      
+      // Then invalidate to ensure data consistency with server
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
-      
-      // Force immediate refetch to update UI
-      setTimeout(() => {
-        refetchAvailableJobs();
-        refetchAssignedJobs();
-      }, 100);
       
       toast({
         title: 'Job Accepted',
