@@ -1,8 +1,8 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { User, Boat, Reservation, Payment, Zone, Waiver, WaiverAcceptance } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 // =================== USER OPERATIONS ===================
 export const useGetCurrentUser = () => {
@@ -56,41 +56,43 @@ export const useGetZones = () => {
   });
 };
 
-// =================== RESERVATION OPERATIONS ===================
+// User Reservations Hook
 export const useGetUserReservations = (userId?: string) => {
+  const { user } = useAuth();
+  const finalUserId = userId || user?.id;
+  
   return useQuery({
-    queryKey: ['userReservations', userId],
+    queryKey: ['userReservations', finalUserId],
     queryFn: async () => {
-      if (!userId) return [];
-      
+      if (!finalUserId) {
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('reservations')
         .select(`
           id,
           status,
           start_time,
-          end_time, 
-          distance_traveled,
-          total_minutes,
+          end_time,
           estimated_cost,
           final_cost,
           created_at,
-          boats:boat_id(*),
-          start_zone:start_zone_id(*),
-          end_zone:end_zone_id(*)
+          boat:boat_id (boat_name),
+          start_zone:start_zone_id (zone_name),
+          end_zone:end_zone_id (zone_name)
         `)
-        .eq('user_id', userId)
+        .eq('user_id', finalUserId)
         .order('created_at', { ascending: false });
-        
+
       if (error) {
         console.error('Error fetching user reservations:', error);
         throw error;
       }
-      
-      console.log('Fetched user reservations:', data);
+
       return data;
     },
-    enabled: !!userId
+    enabled: !!finalUserId,
   });
 };
 

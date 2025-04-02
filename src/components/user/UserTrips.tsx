@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { formatStatus, getStatusBadgeVariant } from "@/lib/utils";
 import { useGetUserReservations } from "@/hooks/useDatabase";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompleteRideButton } from "./CompleteRideButton";
 
 interface UserTripsProps {
   userId?: string;
@@ -93,7 +94,7 @@ const UserTrips: React.FC<UserTripsProps> = ({ userId }) => {
                         <div className="flex items-center">
                           <Ship className="h-4 w-4 text-blue-500 mr-1" />
                           <span className="text-sm">
-                            Boat: {reservation.boats?.boat_name || 'Awaiting assignment'}
+                            Boat: {reservation.boat?.boat_name || 'Awaiting assignment'}
                           </span>
                         </div>
                         
@@ -120,6 +121,13 @@ const UserTrips: React.FC<UserTripsProps> = ({ userId }) => {
                             Total Cost: ${parseFloat(String(reservation.final_cost)).toFixed(2)}
                           </div>
                         )}
+                        
+                        {/* Complete Ride Button for in-progress reservations */}
+                        {reservation.status === 'in_progress' && (
+                          <div className="mt-4">
+                            <CompleteRideButton reservationId={reservation.id} />
+                          </div>
+                        )}
                       </div>
                     </div>
                     
@@ -143,12 +151,12 @@ const UserTrips: React.FC<UserTripsProps> = ({ userId }) => {
                           </p>
                         </div>
                       </div>
-                      {reservation.boats && (
+                      {reservation.boat && (
                         <div className="flex items-start">
                           <div className="flex-shrink-0 h-4 w-4 rounded-full bg-blue-500 mt-1"></div>
                           <div className="ml-2">
                             <p className="text-xs font-medium">Boat Assigned</p>
-                            <p className="text-xs text-gray-500">{reservation.boats.boat_name}</p>
+                            <p className="text-xs text-gray-500">{reservation.boat.boat_name}</p>
                           </div>
                         </div>
                       )}
