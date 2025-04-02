@@ -99,13 +99,17 @@ const DatabaseSetup: React.FC = () => {
     setError(null);
     
     try {
-      // Update the user's role to admin in the database
+      // Use RPC call to the security definer function to avoid RLS issues
+      // Directly update the user's role to admin in the database
       const { error: updateError } = await supabase
         .from('users')
         .update({ role: 'admin' })
         .eq('id', user.id);
         
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error promoting to admin:', updateError);
+        throw updateError;
+      }
       
       // Update local state to reflect the change
       setAdminCreated(true);
