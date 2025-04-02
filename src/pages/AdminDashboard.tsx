@@ -94,31 +94,6 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-blue-600">PaddleRide Admin</h1>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-600">
-                Welcome, {user?.name || user?.email || 'Admin'} 
-                <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
-                  Administrator
-                </span>
-              </span>
-              <Link to="/dashboard">
-                <Button variant="outline" size="sm">
-                  Dashboard
-                </Button>
-              </Link>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Admin Dashboard</h2>
@@ -255,7 +230,7 @@ const AdminDashboard = () => {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {reservation.start_zone?.[0]?.zone_name || 'Unknown'} → {reservation.end_zone?.[0]?.zone_name || 'Unknown'}
+                              {reservation.zones_start_zone?.zone_name || 'Unknown'} → {reservation.zones_end_zone?.zone_name || 'Unknown'}
                             </TableCell>
                             <TableCell>
                               {new Date(reservation.created_at).toLocaleDateString()}
@@ -297,20 +272,6 @@ const AdminDashboard = () => {
                                       </SelectGroup>
                                     </SelectContent>
                                   </Select>
-                                )}
-
-                                {reservation.status === 'confirmed' && (
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => assignLiaisonMutation.mutate({ 
-                                      reservationId: reservation.id, 
-                                      liaisonId: availableLiaisons?.[0]?.id 
-                                    })}
-                                  >
-                                    <Truck className="h-4 w-4 mr-1" />
-                                    Assign Delivery
-                                  </Button>
                                 )}
                               </div>
                             </TableCell>
@@ -357,10 +318,10 @@ const AdminDashboard = () => {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 my-3">
                           <div>
-                            <p className="text-sm text-gray-600">From: <span className="font-medium">{reservation.start_zone?.[0]?.zone_name || 'Unknown'}</span></p>
+                            <p className="text-sm text-gray-600">From: <span className="font-medium">{reservation.zones_start_zone?.zone_name || 'Unknown'}</span></p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-600">To: <span className="font-medium">{reservation.end_zone?.[0]?.zone_name || 'Unspecified'}</span></p>
+                            <p className="text-sm text-gray-600">To: <span className="font-medium">{reservation.zones_end_zone?.zone_name || 'Unspecified'}</span></p>
                           </div>
                         </div>
                         

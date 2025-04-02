@@ -40,14 +40,14 @@ export const executeSchema = async () => {
         } else {
           console.log(`Successfully executed statement ${i + 1}`);
         }
-      } catch (stmtError) {
+      } catch (stmtError: any) { // Add type annotation here
         console.error(`Exception executing statement ${i + 1}:`, stmtError);
       }
     }
     
     console.log('Schema execution completed');
     return { success: true };
-  } catch (error) {
+  } catch (error: any) { // Add type annotation here
     console.error('Failed to execute schema:', error);
     return { success: false, error };
   }
@@ -71,7 +71,7 @@ export const isSchemaSetup = async () => {
     
     // If we can query the boats table, schema is set up
     return true;
-  } catch (error) {
+  } catch (error: any) { // Add type annotation here
     console.error('Exception checking schema setup:', error);
     return false;
   }

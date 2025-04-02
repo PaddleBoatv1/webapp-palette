@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +16,7 @@ import AuthCallback from "./components/AuthCallback";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import DatabaseSetup from "./components/DatabaseSetup";
 import { useEffect } from "react";
+import Navbar from "./components/navigation/Navbar";
 
 const queryClient = new QueryClient();
 
@@ -133,19 +133,22 @@ const AppRoutes = () => {
   const { user } = useAuth();
   
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/login" element={<AuthRoute element={<Login />} />} />
-      <Route path="/signup" element={<AuthRoute element={<Signup />} />} />
-      <Route path="/liaison-signup" element={<AuthRoute element={<LiaisonSignup />} />} />
-      <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
-      <Route path="/create-reservation" element={<ProtectedRoute element={<CreateReservation />} />} />
-      <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
-      <Route path="/liaison" element={<LiaisonRoute element={<LiaisonDashboard />} />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/db-setup" element={<DatabaseSetup />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/login" element={<AuthRoute element={<Login />} />} />
+        <Route path="/signup" element={<AuthRoute element={<Signup />} />} />
+        <Route path="/liaison-signup" element={<AuthRoute element={<LiaisonSignup />} />} />
+        <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
+        <Route path="/create-reservation" element={<ProtectedRoute element={<CreateReservation />} />} />
+        <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
+        <Route path="/liaison" element={<LiaisonRoute element={<LiaisonDashboard />} />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/db-setup" element={<DatabaseSetup />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 };
 
@@ -157,16 +160,9 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <div className="bg-black p-2 text-white text-center">
-              <a href="/db-setup" className="hover:underline">
-                Database Setup Page →
-              </a>
-              <span className="px-4">|</span>
-              <a href="/liaison-signup" className="hover:underline">
-                Become a Delivery Executive →
-              </a>
+            <div className="min-h-screen bg-gray-50 flex flex-col">
+              <AppRoutes />
             </div>
-            <AppRoutes />
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

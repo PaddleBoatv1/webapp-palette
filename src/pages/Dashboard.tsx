@@ -3,13 +3,12 @@ import React, { useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { MapPin, Calendar, Clock, LogOut, Ship, Settings, Truck, CreditCard } from "lucide-react";
+import { MapPin, Calendar, Clock, Ship, Settings, Truck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "@/hooks/use-toast";
 import UserTrips from "@/components/user/UserTrips";
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
   // Log the user role to debug
   useEffect(() => {
@@ -20,52 +19,7 @@ const Dashboard = () => {
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <header className="bg-white shadow">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-blue-600">PaddleRide</h1>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-600">
-                Welcome, {user?.email || 'User'} 
-                {user?.role && (
-                  <span className={`ml-2 px-2 py-1 ${
-                    user.role === 'admin' 
-                      ? 'bg-purple-100 text-purple-800' 
-                      : user.role === 'liaison' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-blue-100 text-blue-800'
-                  } text-xs font-medium rounded-full`}>
-                    {user.role === 'liaison' ? 'Delivery Executive' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                  </span>
-                )}
-              </span>
-              {user?.role === 'admin' && (
-                <Link to="/admin">
-                  <Button variant="outline" size="sm">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Admin Panel
-                  </Button>
-                </Link>
-              )}
-              {user?.role === 'liaison' && (
-                <Link to="/liaison">
-                  <Button variant="outline" size="sm">
-                    <Truck className="h-4 w-4 mr-2" />
-                    Delivery Dashboard
-                  </Button>
-                </Link>
-              )}
-              <Button variant="outline" size="sm" onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-      
-      {/* Main Content */}
+      {/* Main Content - Removed the header as we now have a global navbar */}
       <main className="container mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
         
@@ -151,29 +105,14 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">New Delivery & Pickup Jobs</CardTitle>
+                <CardTitle className="text-lg">Delivery & Pickup Dashboard</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 mb-4">Check available jobs and accept new assignments</p>
+                <p className="text-gray-500 mb-4">Manage your assignments and view available jobs</p>
                 <Link to="/liaison">
                   <Button className="w-full">
                     <Ship className="h-4 w-4 mr-2" />
-                    View Available Jobs
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">My Assignments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500 mb-4">Manage your current delivery and pickup jobs</p>
-                <Link to="/liaison">
-                  <Button variant="outline" className="w-full">
-                    <Truck className="h-4 w-4 mr-2" />
-                    View Assignments
+                    Open Dashboard
                   </Button>
                 </Link>
               </CardContent>

@@ -1,10 +1,8 @@
-
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, Clock, MapPin, User, Truck, ShieldCheck, AlertTriangle, CheckCircle, History } from "lucide-react";
-import { Link, useNavigate } from 'react-router-dom';
+import { Clock, MapPin, User, Truck, ShieldCheck, AlertTriangle, CheckCircle, History } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
 import { useLiaisonDashboard } from '@/hooks/useLiaisonDashboard';
 import {
@@ -18,8 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 const LiaisonDashboard = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     availableJobs,
     assignedJobs,
@@ -34,11 +31,6 @@ const LiaisonDashboard = () => {
     liaisonProfile,
   } = useLiaisonDashboard();
   const [jobInFocus, setJobInFocus] = useState<string | null>(null);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
 
   const getStatusBadge = (status: string) => {
     if (status === 'assigned') {
@@ -64,33 +56,7 @@ const LiaisonDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <header className="bg-white shadow">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-green-600">PaddleRide Delivery</h1>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-600">
-                Welcome, {user?.name || user?.email || 'Executive'} 
-                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                  Delivery Executive
-                </span>
-              </span>
-              <Link to="/dashboard">
-                <Button variant="outline" size="sm">
-                  Dashboard
-                </Button>
-              </Link>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-      
-      {/* Main Content */}
+      {/* Main Content - Removed header since we now have a global navbar */}
       <main className="container mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold mb-6">Delivery Dashboard</h2>
         
@@ -205,9 +171,7 @@ const LiaisonDashboard = () => {
                               {job.jobType === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {job.jobType === 'delivery' 
-                                ? job.startZoneName || 'Unknown Zone'
-                                : job.endZoneName || 'Unknown Zone'}
+                              {job.startZoneName || 'Unknown Zone'} → {job.endZoneName || 'Unknown Zone'}
                             </div>
                           </div>
                         </div>
