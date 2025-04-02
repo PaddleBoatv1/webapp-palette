@@ -224,6 +224,9 @@ export const useLiaisonDashboard = () => {
         throw new Error('This job is no longer available');
       }
 
+      console.log('Job data:', jobData); // Debug log to see the job data structure
+      console.log('Reservation ID from job:', jobData.reservation_id); // Debug log
+
       // Check liaison capacity
       if (liaisonProfile.current_job_count >= liaisonProfile.max_concurrent_jobs) {
         throw new Error('You have reached your maximum job capacity');
@@ -231,11 +234,18 @@ export const useLiaisonDashboard = () => {
 
       // Check if the liaison is already assigned to another job for the same reservation
       // This prevents double-counting when assigning both delivery and pickup jobs
+      if (!jobData.reservation_id) {
+        console.error('Job has no reservation_id, cannot check for existing assignments');
+        throw new Error('Invalid job data: missing reservation ID');
+      }
+      
       const { data: existingJobs, error: existingJobsError } = await supabase
         .from('delivery_jobs')
-        .select('*')
+        .select('id, job_type, reservation_id')
         .eq('reservation_id', jobData.reservation_id)
         .eq('liaison_id', liaisonProfile.id);
+
+      console.log('Existing jobs check:', existingJobs); // Debug log
         
       if (existingJobsError) {
         console.error('Error checking existing jobs:', existingJobsError);

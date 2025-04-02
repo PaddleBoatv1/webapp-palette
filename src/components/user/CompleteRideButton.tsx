@@ -27,6 +27,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
         return [];
       }
       
+      console.log("Existing pickup jobs:", data); // Debug log
       return data || [];
     }
   });
@@ -47,6 +48,9 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
         
         // Only create a pickup job if one doesn't already exist
         if (!existingJobs || existingJobs.length === 0) {
+          // Log that we're creating a new pickup job
+          console.log("No existing pickup jobs found, creating a new one for reservation:", reservationId);
+          
           // Explicitly create the pickup job to ensure it works regardless of RLS policies
           const { error: jobError } = await supabase
             .from('delivery_jobs')
