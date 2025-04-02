@@ -216,16 +216,17 @@ export function useAdminDashboard() {
     // Find the most popular zone based on reservation count
     let zoneCounts: Record<string, number> = {};
     reservations?.forEach(res => {
-      if (res.start_zone && typeof res.start_zone !== 'string') {
-        // Check if start_zone is an array with objects that have an id property
-        if (Array.isArray(res.start_zone) && res.start_zone.length > 0 && res.start_zone[0] && 'id' in res.start_zone[0]) {
-          const startZoneId = res.start_zone[0].id;
-          if (startZoneId) {
-            zoneCounts[startZoneId] = (zoneCounts[startZoneId] || 0) + 1;
-          }
-        } else if (res.start_zone_id) {
-          // Fallback to start_zone_id if available
-          zoneCounts[res.start_zone_id] = (zoneCounts[res.start_zone_id] || 0) + 1;
+      // Check if start_zone exists and is not null
+      if (res.start_zone) {
+        // Handle start_zone that could be an array or an object
+        const zoneId = Array.isArray(res.start_zone) && res.start_zone.length > 0 
+          ? res.start_zone[0]?.id 
+          : typeof res.start_zone === 'object' && res.start_zone !== null 
+            ? res.start_zone.id 
+            : null;
+        
+        if (zoneId) {
+          zoneCounts[zoneId] = (zoneCounts[zoneId] || 0) + 1;
         }
       }
     });
