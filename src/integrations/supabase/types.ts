@@ -122,25 +122,31 @@ export type Database = {
       company_liaisons: {
         Row: {
           created_at: string | null
+          current_job_count: number | null
           current_location: Json | null
           id: string
           is_active: boolean | null
+          max_concurrent_jobs: number | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
+          current_job_count?: number | null
           current_location?: Json | null
           id?: string
           is_active?: boolean | null
+          max_concurrent_jobs?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
+          current_job_count?: number | null
           current_location?: Json | null
           id?: string
           is_active?: boolean | null
+          max_concurrent_jobs?: number | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -150,6 +156,57 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_jobs: {
+        Row: {
+          assigned_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          job_type: string
+          liaison_id: string | null
+          reservation_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          job_type: string
+          liaison_id?: string | null
+          reservation_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          job_type?: string
+          liaison_id?: string | null
+          reservation_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_jobs_liaison_id_fkey"
+            columns: ["liaison_id"]
+            isOneToOne: false
+            referencedRelation: "company_liaisons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_jobs_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
         ]
@@ -444,6 +501,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_delivery_job: {
+        Args: {
+          job_id: string
+          assign_to_liaison_id: string
+        }
+        Returns: Json
+      }
       exec_sql: {
         Args: {
           sql_query: string
@@ -451,6 +515,12 @@ export type Database = {
         Returns: undefined
       }
       is_admin: {
+        Args: {
+          user_id: string
+        }
+        Returns: boolean
+      }
+      is_liaison: {
         Args: {
           user_id: string
         }

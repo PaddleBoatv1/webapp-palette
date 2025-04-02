@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +10,8 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import CreateReservation from "./pages/CreateReservation";
 import AdminDashboard from "./pages/AdminDashboard";
+import LiaisonSignup from "./pages/LiaisonSignup";
+import LiaisonDashboard from "./pages/LiaisonDashboard";
 import NotFound from "./pages/NotFound";
 import AuthCallback from "./components/AuthCallback";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -68,17 +71,51 @@ const AdminRoute = ({ element }: { element: React.ReactNode }) => {
   return (isAuthenticated && user?.role === 'admin') ? <>{element}</> : null;
 };
 
+// Liaison route - only for users with liaison role
+const LiaisonRoute = ({ element }: { element: React.ReactNode }) => {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        console.log("Not authenticated, redirecting to login from liaison route");
+        navigate('/login', { replace: true });
+      } else if (user?.role !== 'liaison') {
+        console.log("Not liaison, redirecting to dashboard");
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [isAuthenticated, isLoading, navigate, user]);
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+  
+  return (isAuthenticated && user?.role === 'liaison') ? <>{element}</> : null;
+};
+
 // Auth routes - redirect to dashboard if already logged in
 const AuthRoute = ({ element }: { element: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
   
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      console.log("Already authenticated, redirecting to dashboard");
-      navigate('/dashboard', { replace: true });
+      console.log("Already authenticated, redirecting to appropriate dashboard");
+      if (user?.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (user?.role === 'liaison') {
+        navigate('/liaison', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, user]);
   
   if (isLoading) {
     return (
@@ -91,15 +128,32 @@ const AuthRoute = ({ element }: { element: React.ReactNode }) => {
   return !isAuthenticated ? <>{element}</> : null;
 };
 
+// Custom route for the dashboard, directs to role-specific dashboard
+const DashboardRouter = () => {
+  const { user } = useAuth();
+  
+  if (user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  
+  if (user?.role === 'liaison') {
+    return <Navigate to="/liaison" replace />;
+  }
+  
+  return <Dashboard />;
+};
+
 const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<AuthRoute element={<Login />} />} />
       <Route path="/signup" element={<AuthRoute element={<Signup />} />} />
-      <Route path="/dashboard" element={<ProtectedRoute element={<Dashboard />} />} />
+      <Route path="/liaison-signup" element={<AuthRoute element={<LiaisonSignup />} />} />
+      <Route path="/dashboard" element={<ProtectedRoute element={<DashboardRouter />} />} />
       <Route path="/create-reservation" element={<ProtectedRoute element={<CreateReservation />} />} />
       <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
+      <Route path="/liaison" element={<LiaisonRoute element={<LiaisonDashboard />} />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/db-setup" element={<DatabaseSetup />} />
       <Route path="*" element={<NotFound />} />
@@ -118,6 +172,10 @@ const App = () => {
             <div className="bg-black p-2 text-white text-center">
               <a href="/db-setup" className="hover:underline">
                 Database Setup Page →
+              </a>
+              <span className="px-4">|</span>
+              <a href="/liaison-signup" className="hover:underline">
+                Become a Delivery Executive →
               </a>
             </div>
             <AppRoutes />
