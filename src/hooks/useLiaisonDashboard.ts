@@ -196,45 +196,102 @@ export const useLiaisonDashboard = () => {
       
       console.log(`Accepting job ${jobId} for liaison ${liaisonId}`);
       
-      // Directly update the job without checking if it's available first
-      // This avoids potential race conditions
-      const { data, error } = await supabase
+      // First verify that the job is still available (though we'll handle the errors appropriately if it's not)
+      const { data: jobData, error: jobError } = await supabase
         .from('delivery_jobs')
-        .update({ 
-          liaison_id: liaisonId,
-          status: 'assigned',
-          assigned_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .select('*')
+        .eq('id', jobId);
+        
+      if (jobError) {
+        console.error('Error checking job availability:', jobError);
+        throw new Error('Error checking job availability');
+      }
+      
+      if (!jobData || jobData.length === 0 || jobData[0].status !== 'available') {
+        console.error('Job is no longer available or has already been assigned');
+        throw new Error('Job is no longer available');
+      }
+      
+      // Use the Supabase RPC function for assigning the job in a transaction-safe way
+      const { data: assignResult, error: assignError } = await supabase
+        .rpc('assign_delivery_job', { 
+          job_id: jobId, 
+          assign_to_liaison_id: liaisonId 
+        });
+        
+      if (assignError) {
+        console.error('Error assigning job:', assignError);
+        throw new Error('Failed to assign job');
+      }
+      
+      if (!assignResult.success) {
+        console.error('Job assignment failed:', assignResult.message);
+        throw new Error(assignResult.message);
+      }
+      
+      console.log('Job acceptance result:', assignResult);
+      
+      // Get the updated job data to return and update the cache
+      const { data: updatedJobData, error: updatedJobError } = await supabase
+        .from('delivery_jobs')
+        .select(`
+          id,
+          reservation_id,
+          job_type,
+          status,
+          assigned_at,
+          completed_at,
+          created_at,
+          updated_at,
+          liaison_id,
+          reservation:reservation_id (
+            id,
+            status,
+            users:user_id (
+              id,
+              email,
+              full_name,
+              phone_number
+            ),
+            start_zone:start_zone_id (
+              id,
+              zone_name,
+              coordinates
+            ),
+            end_zone:end_zone_id (
+              id,
+              zone_name,
+              coordinates
+            )
+          )
+        `)
         .eq('id', jobId)
-        .select();
+        .single();
         
-      if (error) {
-        console.error('Error accepting job:', error);
-        throw error;
+      if (updatedJobError) {
+        console.error('Error fetching updated job data:', updatedJobError);
+        // We'll still consider this a success, since the job was assigned
       }
       
-      if (!data || data.length === 0) {
-        throw new Error('Failed to update job');
-      }
+      console.log('Job accepted successfully, updated data:', updatedJobData);
       
-      console.log('Job update successful:', data);
+      // Process the job data in the same format as our other queries
+      const processedJobData = updatedJobData ? {
+        ...updatedJobData,
+        reservation: {
+          ...updatedJobData.reservation,
+          users: updatedJobData.reservation?.users ? (Array.isArray(updatedJobData.reservation.users) ? updatedJobData.reservation.users : [updatedJobData.reservation.users]) : [],
+          start_zone: updatedJobData.reservation?.start_zone ? (Array.isArray(updatedJobData.reservation.start_zone) ? updatedJobData.reservation.start_zone : [updatedJobData.reservation.start_zone]) : [],
+          end_zone: updatedJobData.reservation?.end_zone ? (Array.isArray(updatedJobData.reservation.end_zone) ? updatedJobData.reservation.end_zone : [updatedJobData.reservation.end_zone]) : []
+        }
+      } : null;
       
-      // Update the liaison's job count separately
-      const { error: updateError } = await supabase
-        .from('company_liaisons')
-        .update({ 
-          current_job_count: supabase.rpc('increment_count', { row_id: liaisonId })
-        })
-        .eq('id', liaisonId);
-        
-      if (updateError) {
-        console.error('Error updating liaison job count:', updateError);
-        // Not throwing here to ensure UI updates even if job count fails
-      }
-      
-      console.log('Job accepted successfully');
-      return data[0];
+      return processedJobData || {
+        id: jobId,
+        status: 'assigned',
+        liaison_id: liaisonId,
+        reservation_id: jobData[0].reservation_id
+      };
     },
     onSuccess: (data) => {
       console.log('Success data from job acceptance:', data);
@@ -253,6 +310,12 @@ export const useLiaisonDashboard = () => {
       // Then invalidate to ensure data consistency with server
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       queryClient.invalidateQueries({ queryKey: ['assignedJobs', liaisonId] });
+      
+      // Force immediate refetch to ensure UI is up-to-date
+      setTimeout(() => {
+        refetchAvailableJobs();
+        refetchAssignedJobs();
+      }, 500);
       
       toast({
         title: 'Job Accepted',
