@@ -19,6 +19,10 @@ interface WaiverModalProps {
   onCancel: () => void;
 }
 
+/**
+ * Modal component for displaying and accepting safety waivers
+ * Users must check the agreement box before proceeding
+ */
 const WaiverModal = ({ waiver, onAccept, onCancel }: WaiverModalProps) => {
   const [hasAgreed, setHasAgreed] = useState(false);
   const [open, setOpen] = useState(true);
