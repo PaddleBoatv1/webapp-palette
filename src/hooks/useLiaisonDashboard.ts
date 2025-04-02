@@ -98,8 +98,7 @@ export const useLiaisonDashboard = () => {
         throw error;
       }
 
-      // Cast to the correct type
-      return data as unknown as LiaisonProfile;
+      return data as LiaisonProfile;
     },
     enabled: !!user?.id,
   });
@@ -146,7 +145,6 @@ export const useLiaisonDashboard = () => {
       }
 
       console.log('Available jobs fetched:', data.length);
-      // Cast to correct type - the actual data structure matches our DeliveryJob interface
       return data as unknown as DeliveryJob[];
     },
     enabled: !!liaisonProfile,
@@ -195,7 +193,6 @@ export const useLiaisonDashboard = () => {
       }
 
       console.log('Assigned jobs fetched:', data.length);
-      // Cast to correct type
       return data as unknown as DeliveryJob[];
     },
     enabled: !!liaisonProfile?.id,
@@ -244,7 +241,7 @@ export const useLiaisonDashboard = () => {
         throw new Error(error.message || 'Failed to update job');
       }
 
-      // Handle the response, which is a JSON object with success and message fields
+      // Handle the response from the RPC function
       const response = data as unknown as AssignJobResponse;
       
       if (!response.success) {
@@ -318,15 +315,19 @@ export const useLiaisonDashboard = () => {
 
       if (error) throw error;
       
-      // Also update the reservation status to in_progress
+      // Find the job to get the reservation ID
       const job = assignedJobs?.find(j => j.id === jobId);
+      
       if (job && job.reservation) {
-        const { error: resError } = await supabase
-          .from('reservations')
-          .update({ status: 'in_progress' })
-          .eq('id', job.reservation_id);
-          
-        if (resError) throw resError;
+        // If it's a delivery job, set the reservation to in_progress
+        if (job.job_type === 'delivery') {
+          const { error: resError } = await supabase
+            .from('reservations')
+            .update({ status: 'in_progress', start_time: new Date().toISOString() })
+            .eq('id', job.reservation_id);
+            
+          if (resError) throw resError;
+        }
       }
       
       // Manually decrease the liaison's job count since a completed delivery frees up capacity
@@ -351,7 +352,7 @@ export const useLiaisonDashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
       toast({
         title: 'Delivery Completed',
-        description: 'You have completed the delivery',
+        description: 'You have completed the delivery and the customer can now use the boat',
       });
     },
     onError: (error: any) => {
@@ -410,6 +411,25 @@ export const useLiaisonDashboard = () => {
       // Also update the reservation status to completed
       const job = assignedJobs?.find(j => j.id === jobId);
       if (job && job.reservation) {
+        // Update boat status to available for new rentals
+        const { data: reservationData, error: resQueryError } = await supabase
+          .from('reservations')
+          .select('boat_id')
+          .eq('id', job.reservation_id)
+          .single();
+          
+        if (resQueryError) throw resQueryError;
+        
+        if (reservationData.boat_id) {
+          // Update the boat status to available
+          const { error: boatError } = await supabase
+            .from('boats')
+            .update({ status: 'available' })
+            .eq('id', reservationData.boat_id);
+            
+          if (boatError) throw boatError;
+        }
+        
         const { error: resError } = await supabase
           .from('reservations')
           .update({ 
@@ -443,7 +463,7 @@ export const useLiaisonDashboard = () => {
       queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
       toast({
         title: 'Pickup Completed',
-        description: 'You have completed the pickup',
+        description: 'You have completed the pickup. The boat is now available for new rentals.',
       });
     },
     onError: (error: any) => {

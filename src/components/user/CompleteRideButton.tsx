@@ -14,7 +14,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
   
   const completeRideMutation = useMutation({
     mutationFn: async () => {
-      // Update reservation status to "awaiting_pickup"
+      // First update reservation status to "awaiting_pickup"
       const { error } = await supabase
         .from('reservations')
         .update({ status: 'awaiting_pickup' })
@@ -22,13 +22,16 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
         
       if (error) throw error;
       
+      // This will trigger the database function that creates a pickup job 
+      // via the create_delivery_job_on_reservation_confirm trigger
+      
       return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userReservations'] });
       toast({
         title: "Ride Completed",
-        description: "Your ride has been completed and a pickup request has been sent.",
+        description: "Your ride has been completed and a pickup request has been sent. Please wait for a liaison to collect the boat.",
       });
     },
     onError: (error: any) => {
