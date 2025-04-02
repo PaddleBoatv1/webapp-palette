@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -222,7 +221,7 @@ export function useAdminDashboard() {
         const zoneId = Array.isArray(res.start_zone) && res.start_zone.length > 0 
           ? res.start_zone[0]?.id 
           : typeof res.start_zone === 'object' && res.start_zone !== null 
-            ? res.start_zone.id 
+            ? (res.start_zone as any).id 
             : null;
         
         if (zoneId) {

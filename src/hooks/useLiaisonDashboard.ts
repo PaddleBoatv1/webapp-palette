@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
@@ -274,6 +273,7 @@ export const useLiaisonDashboard = () => {
   // Start delivery (transition job from assigned to in_progress)
   const startDeliveryMutation = useMutation({
     mutationFn: async (jobId: string) => {
+      // Only update the job status, don't change the liaison assignment
       const { data, error } = await supabase
         .from('delivery_jobs')
         .update({ status: 'in_progress' })
@@ -330,29 +330,18 @@ export const useLiaisonDashboard = () => {
         }
       }
       
-      // Manually decrease the liaison's job count since a completed delivery frees up capacity
-      if (liaisonProfile?.id) {
-        const { error: liaisionError } = await supabase
-          .from('company_liaisons')
-          .update({ 
-            current_job_count: Math.max(0, (liaisonProfile.current_job_count - 1))
-          })
-          .eq('id', liaisonProfile.id);
-          
-        if (liaisionError) {
-          console.error('Error updating liaison capacity:', liaisionError);
-          // We don't want to throw here, as the primary operation succeeded
-        }
-      }
+      // REMOVED: Don't decrease the liaison's job count when completing delivery
+      // The job is still assigned to the liaison until pickup is done
+      // This ensures the job still appears in the liaison's assigned jobs
       
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
+      // Don't invalidate the liaisonProfile as we're keeping the job count the same
       toast({
         title: 'Delivery Completed',
-        description: 'You have completed the delivery and the customer can now use the boat',
+        description: 'You have successfully delivered the boat to the customer. The customer can now use the boat. You will be assigned to pick up when the customer ends their trip.',
       });
     },
     onError: (error: any) => {
@@ -441,7 +430,7 @@ export const useLiaisonDashboard = () => {
         if (resError) throw resError;
       }
       
-      // Manually decrease the liaison's job count since a completed pickup frees up capacity
+      // Now decrease the liaison's job count since a completed pickup fully completes the job cycle
       if (liaisonProfile?.id) {
         const { error: liaisionError } = await supabase
           .from('company_liaisons')

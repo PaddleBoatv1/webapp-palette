@@ -31,7 +31,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
       queryClient.invalidateQueries({ queryKey: ['userReservations'] });
       toast({
         title: "Ride Completed",
-        description: "Your ride has been completed and a pickup request has been sent. Please wait for a liaison to collect the boat.",
+        description: "Your ride has been completed and a pickup request has been sent. Please wait at the designated zone for a liaison to collect the boat.",
       });
     },
     onError: (error: any) => {
@@ -54,7 +54,7 @@ export const CompleteRideButton: React.FC<CompleteRideButtonProps> = ({ reservat
       variant="secondary"
       className="bg-green-600 hover:bg-green-700 text-white"
     >
-      {completeRideMutation.isPending ? "Processing..." : "Complete Ride"}
+      {completeRideMutation.isPending ? "Processing..." : "End Ride & Request Pickup"}
     </Button>
   );
 };
