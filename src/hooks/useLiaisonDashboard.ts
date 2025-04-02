@@ -258,6 +258,7 @@ export const useLiaisonDashboard = () => {
         console.log('Liaison already has a job for this reservation, not incrementing count');
         
         // Update the job status to assigned without increasing the count
+        // Using .match to ensure we're updating exactly the job we want
         const { data, error } = await supabase
           .from('delivery_jobs')
           .update({ 
@@ -266,7 +267,7 @@ export const useLiaisonDashboard = () => {
             assigned_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq('id', jobId)
+          .match({ id: jobId })
           .select();
           
         if (error) {
@@ -275,6 +276,38 @@ export const useLiaisonDashboard = () => {
         }
         
         console.log('Job assigned successfully without incrementing count:', data);
+        
+        // If data is empty but no error, try to verify the update worked
+        if (!data || data.length === 0) {
+          const { data: verifyData, error: verifyError } = await supabase
+            .from('delivery_jobs')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+            
+          if (verifyError) {
+            console.error('Error verifying job update:', verifyError);
+          } else {
+            console.log('Verified job status after update:', verifyData);
+            // Make sure the job is actually assigned to this liaison
+            if (verifyData && verifyData.status === 'assigned' && verifyData.liaison_id === liaisonProfile.id) {
+              return { success: true, message: 'Job assigned successfully' };
+            }
+          }
+          
+          // If we can't verify the update worked, try one more direct update approach
+          const { error: retryError } = await supabase
+            .rpc('update_delivery_job_assignment', {
+              job_id: jobId,
+              liaison_id: liaisonProfile.id
+            });
+            
+          if (retryError) {
+            console.error('Error in retry update:', retryError);
+            throw new Error(retryError.message || 'Failed to update job on retry');
+          }
+        }
+        
         return { success: true, message: 'Job assigned successfully' };
       }
 

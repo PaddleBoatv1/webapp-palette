@@ -115,3 +115,18 @@ export type Notification = {
   message_content: string;
   sent_at?: string;
 };
+
+// Add the update_delivery_job_assignment RPC function to allow manual job assignment
+export const updateDeliveryJobAssignment = async (jobId: string, liaisonId: string) => {
+  const { data, error } = await supabase.rpc('update_delivery_job_assignment', {
+    job_id: jobId,
+    liaison_id: liaisonId
+  });
+  
+  if (error) {
+    console.error('Error updating job assignment:', error);
+    throw error;
+  }
+  
+  return data;
+};
