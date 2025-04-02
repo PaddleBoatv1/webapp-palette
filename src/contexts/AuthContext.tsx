@@ -213,12 +213,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) throw error;
       
       if (data.user) {
+        // After successful login, fetch user profile data to get the role
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role, full_name')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (userError && userError.code !== 'PGRST116') {
+          console.error("Error fetching user role:", userError);
+        }
+        
         toast({
           title: "Login Successful",
           description: "You have been logged in successfully",
         });
         
-        navigate('/dashboard');
+        // Navigate based on role
+        if (userData?.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (error: any) {
       console.error('Login error:', error);

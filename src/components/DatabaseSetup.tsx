@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -113,7 +112,7 @@ const DatabaseSetup: React.FC = () => {
       if (admin) {
         toast({
           title: "Admin Created",
-          description: `Admin user ${adminEmail} has been created successfully.`,
+          description: `Admin user ${adminEmail} has been created successfully. You can now login with these credentials.`,
         });
         setAdminCreated(true);
         setError(null);
@@ -122,7 +121,7 @@ const DatabaseSetup: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error creating admin:', err);
-      let errorMessage = 'Failed to create admin user. Check console for details.';
+      let errorMessage = 'Failed to create admin user.';
       
       if (err.message) {
         errorMessage = err.message;
