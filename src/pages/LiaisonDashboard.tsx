@@ -167,9 +167,9 @@ const LiaisonDashboard = () => {
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center">
-                          {getJobTypeIcon(job.job_type)}
+                          {getJobTypeIcon(job.jobType)}
                           <CardTitle className="text-lg ml-2">
-                            {job.job_type === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
+                            {job.jobType === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
                           </CardTitle>
                         </div>
                         {getStatusBadge(job.status)}
@@ -182,8 +182,8 @@ const LiaisonDashboard = () => {
                           <div>
                             <div className="font-medium">Customer</div>
                             <div className="text-sm text-gray-500">
-                              {job.reservation?.users?.[0]?.full_name || 'Unknown Customer'}
-                              <div>{job.reservation?.users?.[0]?.phone_number || 'No phone provided'}</div>
+                              {job.userName || 'Unknown Customer'}
+                              <div>{job.userPhone || 'No phone provided'}</div>
                             </div>
                           </div>
                         </div>
@@ -192,12 +192,12 @@ const LiaisonDashboard = () => {
                           <MapPin className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
                           <div>
                             <div className="font-medium">
-                              {job.job_type === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
+                              {job.jobType === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {job.job_type === 'delivery' 
-                                ? job.reservation?.start_zone?.[0]?.zone_name || 'Unknown Zone'
-                                : job.reservation?.end_zone?.[0]?.zone_name || 'Unknown Zone'}
+                              {job.jobType === 'delivery' 
+                                ? job.startZoneName || 'Unknown Zone'
+                                : job.endZoneName || 'Unknown Zone'}
                             </div>
                           </div>
                         </div>
@@ -212,7 +212,7 @@ const LiaisonDashboard = () => {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>{job.job_type === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
+                            <DialogTitle>{job.jobType === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
                             <DialogDescription>
                               Assignment information and location details
                             </DialogDescription>
@@ -221,17 +221,17 @@ const LiaisonDashboard = () => {
                             <div className="space-y-2">
                               <h4 className="font-medium">Customer Information</h4>
                               <div className="text-sm">
-                                <p><span className="font-medium">Name:</span> {job.reservation?.users?.[0]?.full_name || 'Unknown'}</p>
-                                <p><span className="font-medium">Phone:</span> {job.reservation?.users?.[0]?.phone_number || 'Not provided'}</p>
-                                <p><span className="font-medium">Email:</span> {job.reservation?.users?.[0]?.email || 'Not provided'}</p>
+                                <p><span className="font-medium">Name:</span> {job.userName || 'Unknown'}</p>
+                                <p><span className="font-medium">Phone:</span> {job.userPhone || 'Not provided'}</p>
+                                <p><span className="font-medium">Email:</span> {job.userEmail || 'Not provided'}</p>
                               </div>
                             </div>
                             
                             <div className="space-y-2">
                               <h4 className="font-medium">Location Information</h4>
                               <div className="text-sm">
-                                <p><span className="font-medium">Start Zone:</span> {job.reservation?.start_zone?.[0]?.zone_name || 'Unknown'}</p>
-                                <p><span className="font-medium">End Zone:</span> {job.reservation?.end_zone?.[0]?.zone_name || 'Unknown'}</p>
+                                <p><span className="font-medium">Start Zone:</span> {job.startZoneName || 'Unknown'}</p>
+                                <p><span className="font-medium">End Zone:</span> {job.endZoneName || 'Unknown'}</p>
                               </div>
                             </div>
                           </div>
@@ -243,7 +243,7 @@ const LiaisonDashboard = () => {
                             >
                               Resign Job
                             </Button>
-                            {job.status === 'assigned' && job.job_type === 'delivery' && (
+                            {job.status === 'assigned' && job.jobType === 'delivery' && (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -252,7 +252,7 @@ const LiaisonDashboard = () => {
                                 Start Delivery
                               </Button>
                             )}
-                            {job.status === 'in_progress' && job.job_type === 'delivery' && (
+                            {job.status === 'in_progress' && job.jobType === 'delivery' && (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -261,7 +261,7 @@ const LiaisonDashboard = () => {
                                 Complete Delivery
                               </Button>
                             )}
-                            {job.status === 'assigned' && job.job_type === 'pickup' && (
+                            {job.status === 'assigned' && job.jobType === 'pickup' && (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -270,7 +270,7 @@ const LiaisonDashboard = () => {
                                 Start Pickup
                               </Button>
                             )}
-                            {job.status === 'in_progress' && job.job_type === 'pickup' && (
+                            {job.status === 'in_progress' && job.jobType === 'pickup' && (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -283,7 +283,7 @@ const LiaisonDashboard = () => {
                         </DialogContent>
                       </Dialog>
                       
-                      {job.status === 'assigned' && job.job_type === 'delivery' && (
+                      {job.status === 'assigned' && job.jobType === 'delivery' && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -292,7 +292,7 @@ const LiaisonDashboard = () => {
                           Start Delivery
                         </Button>
                       )}
-                      {job.status === 'in_progress' && job.job_type === 'delivery' && (
+                      {job.status === 'in_progress' && job.jobType === 'delivery' && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -301,7 +301,7 @@ const LiaisonDashboard = () => {
                           Complete
                         </Button>
                       )}
-                      {job.status === 'assigned' && job.job_type === 'pickup' && (
+                      {job.status === 'assigned' && job.jobType === 'pickup' && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -310,7 +310,7 @@ const LiaisonDashboard = () => {
                           Start Pickup
                         </Button>
                       )}
-                      {job.status === 'in_progress' && job.job_type === 'pickup' && (
+                      {job.status === 'in_progress' && job.jobType === 'pickup' && (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -352,9 +352,9 @@ const LiaisonDashboard = () => {
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
                         <div className="flex items-center">
-                          {getJobTypeIcon(job.job_type)}
+                          {getJobTypeIcon(job.jobType)}
                           <CardTitle className="text-lg ml-2">
-                            {job.job_type === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
+                            {job.jobType === 'delivery' ? 'Boat Delivery' : 'Boat Pickup'}
                           </CardTitle>
                         </div>
                         <Badge variant="outline">Available</Badge>
@@ -367,7 +367,7 @@ const LiaisonDashboard = () => {
                           <div>
                             <div className="font-medium">Customer</div>
                             <div className="text-sm text-gray-500">
-                              {job.reservation?.users?.[0]?.full_name || 'Unknown Customer'}
+                              {job.userName || 'Unknown Customer'}
                             </div>
                           </div>
                         </div>
@@ -376,12 +376,12 @@ const LiaisonDashboard = () => {
                           <MapPin className="h-5 w-5 text-blue-500 mr-2 mt-0.5" />
                           <div>
                             <div className="font-medium">
-                              {job.job_type === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
+                              {job.jobType === 'delivery' ? 'Delivery Location' : 'Pickup Location'}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {job.job_type === 'delivery' 
-                                ? job.reservation?.start_zone?.[0]?.zone_name || 'Unknown Zone'
-                                : job.reservation?.end_zone?.[0]?.zone_name || 'Unknown Zone'}
+                              {job.jobType === 'delivery' 
+                                ? job.startZoneName || 'Unknown Zone'
+                                : job.endZoneName || 'Unknown Zone'}
                             </div>
                           </div>
                         </div>
@@ -394,7 +394,7 @@ const LiaisonDashboard = () => {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>{job.job_type === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
+                            <DialogTitle>{job.jobType === 'delivery' ? 'Boat Delivery Details' : 'Boat Pickup Details'}</DialogTitle>
                             <DialogDescription>
                               Assignment information and location details
                             </DialogDescription>
@@ -403,8 +403,8 @@ const LiaisonDashboard = () => {
                             <div className="space-y-2">
                               <h4 className="font-medium">Location Information</h4>
                               <div className="text-sm">
-                                <p><span className="font-medium">Start Zone:</span> {job.reservation?.start_zone?.[0]?.zone_name || 'Unknown'}</p>
-                                <p><span className="font-medium">End Zone:</span> {job.reservation?.end_zone?.[0]?.zone_name || 'Unknown'}</p>
+                                <p><span className="font-medium">Start Zone:</span> {job.startZoneName || 'Unknown'}</p>
+                                <p><span className="font-medium">End Zone:</span> {job.endZoneName || 'Unknown'}</p>
                               </div>
                             </div>
                           </div>

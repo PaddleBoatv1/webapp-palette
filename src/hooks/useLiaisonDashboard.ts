@@ -31,23 +31,47 @@ interface Zone {
   coordinates: any;
 }
 
+interface Reservation {
+  id: string;
+  user_id: string;
+  status: string;
+  start_zone_id?: string;
+  end_zone_id?: string;
+  user?: User;
+  start_zone?: Zone;
+  end_zone?: Zone;
+}
+
 interface DeliveryJob {
   id: string;
   reservation_id: string;
   status: string;
   job_type: string;
+  liaison_id?: string;
   assigned_at?: string;
   completed_at?: string;
-  reservation?: {
-    id: string;
-    user_id: string;
-    status: string;
-    start_zone_id?: string;
-    end_zone_id?: string;
-    user?: User;
-    start_zone?: Zone;
-    end_zone?: Zone;
-  };
+  reservation?: Reservation;
+}
+
+// Interface for formatted job data
+interface FormattedJob {
+  id: string;
+  status: string;
+  jobType: string;
+  assignedAt: string;
+  completedAt: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userPhone: string;
+  startZoneId: string;
+  startZoneName: string;
+  startZoneCoordinates: any;
+  endZoneId: string;
+  endZoneName: string;
+  endZoneCoordinates: any;
+  reservationId: string;
+  reservationStatus: string;
 }
 
 export const useLiaisonDashboard = () => {
@@ -221,36 +245,186 @@ export const useLiaisonDashboard = () => {
     },
   });
 
-  // Complete a job
-  const completeJobMutation = useMutation({
+  // Start delivery (transition job from assigned to in_progress)
+  const startDeliveryMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const updates = {
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      };
-
       const { data, error } = await supabase
         .from('delivery_jobs')
-        .update(updates)
+        .update({ status: 'in_progress' })
         .eq('id', jobId)
         .eq('liaison_id', liaisonProfile?.id)
         .select();
 
-      if (error) {
-        console.error('Error completing job:', error);
-        throw error;
-      }
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      toast({
+        title: 'Delivery Started',
+        description: 'You have started the delivery process',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error Starting Delivery',
+        description: error.message || 'Something went wrong',
+        variant: 'destructive',
+      });
+    },
+  });
 
+  // Complete delivery
+  const completeDeliveryMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('liaison_id', liaisonProfile?.id)
+        .select();
+
+      if (error) throw error;
+      
+      // Also update the reservation status to in_progress
+      const job = assignedJobs?.find(j => j.id === jobId);
+      if (job && job.reservation) {
+        const { error: resError } = await supabase
+          .from('reservations')
+          .update({ status: 'in_progress' })
+          .eq('id', job.reservation_id);
+          
+        if (resError) throw resError;
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      toast({
+        title: 'Delivery Completed',
+        description: 'You have completed the delivery',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error Completing Delivery',
+        description: error.message || 'Something went wrong',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Start pickup
+  const startPickupMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({ status: 'in_progress' })
+        .eq('id', jobId)
+        .eq('liaison_id', liaisonProfile?.id)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      toast({
+        title: 'Pickup Started',
+        description: 'You have started the pickup process',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error Starting Pickup',
+        description: error.message || 'Something went wrong',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Complete pickup
+  const completePickupMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('liaison_id', liaisonProfile?.id)
+        .select();
+
+      if (error) throw error;
+      
+      // Also update the reservation status to completed
+      const job = assignedJobs?.find(j => j.id === jobId);
+      if (job && job.reservation) {
+        const { error: resError } = await supabase
+          .from('reservations')
+          .update({ 
+            status: 'completed',
+            end_time: new Date().toISOString()
+          })
+          .eq('id', job.reservation_id);
+          
+        if (resError) throw resError;
+      }
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      toast({
+        title: 'Pickup Completed',
+        description: 'You have completed the pickup',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error Completing Pickup',
+        description: error.message || 'Something went wrong',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Resign from a job
+  const resignJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { data, error } = await supabase
+        .from('delivery_jobs')
+        .update({ 
+          status: 'available',
+          liaison_id: null,
+          assigned_at: null 
+        })
+        .eq('id', jobId)
+        .eq('liaison_id', liaisonProfile?.id)
+        .select();
+
+      if (error) throw error;
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
       queryClient.invalidateQueries({ queryKey: ['availableJobs'] });
       queryClient.invalidateQueries({ queryKey: ['liaisonProfile'] });
-      
       toast({
-        title: 'Job Completed',
-        description: 'Job has been marked as completed',
+        title: 'Job Resigned',
+        description: 'You have resigned from this job',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error Resigning Job',
+        description: error.message || 'Something went wrong',
+        variant: 'destructive',
       });
     },
   });
@@ -309,33 +483,35 @@ export const useLiaisonDashboard = () => {
     }
   }, [updateLocationMutation]);
 
-  // Format job data for display
-  const formatJobsForDisplay = useCallback((jobs: DeliveryJob[]) => {
+  // Format job data for display with proper fallbacks to prevent type errors
+  const formatJobsForDisplay = useCallback((jobs: DeliveryJob[]): FormattedJob[] => {
     return jobs.map(job => {
-      // Check if reservation exists and extract information
-      const reservation = job.reservation || {};
+      const reservation = job.reservation || {} as Reservation;
+      const user = reservation.user || {} as User;
+      const start_zone = reservation.start_zone || {} as Zone;
+      const end_zone = reservation.end_zone || {} as Zone;
       
       return {
         id: job.id,
         status: job.status,
         jobType: job.job_type,
-        assignedAt: job.assigned_at,
-        completedAt: job.completed_at,
+        assignedAt: job.assigned_at || '',
+        completedAt: job.completed_at || '',
         
         // User information with fallbacks
         userId: reservation.user_id || '',
-        userEmail: reservation.user?.email || '',
-        userName: reservation.user?.full_name || '',
-        userPhone: reservation.user?.phone_number || '',
+        userEmail: user.email || '',
+        userName: user.full_name || '',
+        userPhone: user.phone_number || '',
         
         // Location information with fallbacks
         startZoneId: reservation.start_zone_id || '',
-        startZoneName: reservation.start_zone?.zone_name || '',
-        startZoneCoordinates: reservation.start_zone?.coordinates || null,
+        startZoneName: start_zone.zone_name || '',
+        startZoneCoordinates: start_zone.coordinates || null,
         
         endZoneId: reservation.end_zone_id || '',
-        endZoneName: reservation.end_zone?.zone_name || '',
-        endZoneCoordinates: reservation.end_zone?.coordinates || null,
+        endZoneName: end_zone.zone_name || '',
+        endZoneCoordinates: end_zone.coordinates || null,
         
         reservationId: job.reservation_id,
         reservationStatus: reservation.status || '',
@@ -350,10 +526,27 @@ export const useLiaisonDashboard = () => {
     isLoadingAvailableJobs,
     assignedJobs: formatJobsForDisplay(assignedJobs || []),
     isLoadingAssignedJobs,
+    isLoading: isLoadingProfile || isLoadingAvailableJobs || isLoadingAssignedJobs,
+    
+    // Job management functions
     acceptJob: (jobId: string) => acceptJobMutation.mutate(jobId),
     isAcceptingJob: acceptJobMutation.isPending,
-    completeJob: (jobId: string) => completeJobMutation.mutate(jobId),
-    isCompletingJob: completeJobMutation.isPending,
+    
+    startDelivery: (jobId: string) => startDeliveryMutation.mutate(jobId),
+    isStartingDelivery: startDeliveryMutation.isPending,
+    
+    completeDelivery: (jobId: string) => completeDeliveryMutation.mutate(jobId),
+    isCompletingDelivery: completeDeliveryMutation.isPending,
+    
+    startPickup: (jobId: string) => startPickupMutation.mutate(jobId),
+    isStartingPickup: startPickupMutation.isPending,
+    
+    completePickup: (jobId: string) => completePickupMutation.mutate(jobId),
+    isCompletingPickup: completePickupMutation.isPending,
+    
+    resignJob: (jobId: string) => resignJobMutation.mutate(jobId),
+    isResigningJob: resignJobMutation.isPending,
+    
     updateCurrentLocation,
     isUpdatingLocation: updateLocationMutation.isPending,
     currentLocation,
