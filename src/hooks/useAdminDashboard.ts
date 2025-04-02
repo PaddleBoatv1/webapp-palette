@@ -1,6 +1,7 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export function useAdminDashboard() {
@@ -215,10 +216,16 @@ export function useAdminDashboard() {
     // Find the most popular zone based on reservation count
     let zoneCounts: Record<string, number> = {};
     reservations?.forEach(res => {
-      if (res.start_zone && res.start_zone.length > 0) {
-        const startZoneId = res.start_zone[0].id;
-        if (startZoneId) {
-          zoneCounts[startZoneId] = (zoneCounts[startZoneId] || 0) + 1;
+      if (res.start_zone && typeof res.start_zone !== 'string') {
+        // Check if start_zone is an array with objects that have an id property
+        if (Array.isArray(res.start_zone) && res.start_zone.length > 0 && res.start_zone[0] && 'id' in res.start_zone[0]) {
+          const startZoneId = res.start_zone[0].id;
+          if (startZoneId) {
+            zoneCounts[startZoneId] = (zoneCounts[startZoneId] || 0) + 1;
+          }
+        } else if (res.start_zone_id) {
+          // Fallback to start_zone_id if available
+          zoneCounts[res.start_zone_id] = (zoneCounts[res.start_zone_id] || 0) + 1;
         }
       }
     });
@@ -541,6 +548,7 @@ export function useAdminDashboard() {
     updateBoatStatusMutation,
     boatStats,
     reservationStats,
-    zoneStats
+    zoneStats,
+    updateLiaisonJobCountMutation
   };
 }
