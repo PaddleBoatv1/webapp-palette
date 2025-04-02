@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -16,6 +15,29 @@ interface ZoneManagerProps {
   zones: Zone[];
   isLoading: boolean;
 }
+
+// Helper function to safely get coordinates regardless of format
+const getCoordinates = (coordinates: any) => {
+  if (!coordinates) {
+    return { lat: 0, lng: 0 };
+  }
+  
+  if (typeof coordinates === 'string') {
+    try {
+      return JSON.parse(coordinates);
+    } catch (e) {
+      console.error('Failed to parse coordinates string:', e);
+      return { lat: 0, lng: 0 };
+    }
+  }
+  
+  // If already an object with lat/lng properties
+  if (coordinates.lat !== undefined && coordinates.lng !== undefined) {
+    return coordinates;
+  }
+  
+  return { lat: 0, lng: 0 };
+};
 
 const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
   const { toast } = useToast();
@@ -291,50 +313,50 @@ const ZoneManager = ({ zones, isLoading }: ZoneManagerProps) => {
               </AlertDescription>
             </Alert>
           ) : (
-            zones.map((zone) => (
-              <Card key={zone.id} className={zone.is_premium ? "border-yellow-500" : ""}>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{zone.zone_name}</CardTitle>
-                    {zone.is_premium && (
-                      <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-                        Premium
-                      </span>
+            zones.map((zone) => {
+              // Safely get coordinates
+              const coords = getCoordinates(zone.coordinates);
+              
+              return (
+                <Card key={zone.id} className={zone.is_premium ? "border-yellow-500" : ""}>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">{zone.zone_name}</CardTitle>
+                      {zone.is_premium && (
+                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                          Premium
+                        </span>
+                      )}
+                    </div>
+                    {zone.description && (
+                      <CardDescription>{zone.description}</CardDescription>
                     )}
-                  </div>
-                  {zone.description && (
-                    <CardDescription>{zone.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="pb-2">
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    {zone.coordinates ? (
-                      <span>
-                        {typeof zone.coordinates === 'string' 
-                          ? JSON.parse(zone.coordinates).lat.toFixed(4) 
-                          : zone.coordinates.lat.toFixed(4)}, 
-                        {typeof zone.coordinates === 'string' 
-                          ? JSON.parse(zone.coordinates).lng.toFixed(4) 
-                          : zone.coordinates.lng.toFixed(4)}
-                      </span>
-                    ) : (
-                      <span>No coordinates set</span>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="ml-auto"
-                    onClick={() => handleDeleteZone(zone.id)}
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {coords.lat !== 0 || coords.lng !== 0 ? (
+                        <span>
+                          {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+                        </span>
+                      ) : (
+                        <span>No coordinates set</span>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="ml-auto"
+                      onClick={() => handleDeleteZone(zone.id)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })
           )}
         </div>
       )}
