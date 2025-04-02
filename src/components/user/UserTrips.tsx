@@ -13,7 +13,7 @@ interface UserTripsProps {
 }
 
 const UserTrips: React.FC<UserTripsProps> = ({ userId }) => {
-  const { data: userReservations, isLoading } = useGetUserReservations(userId);
+  const { data: userReservations, isLoading, error } = useGetUserReservations(userId);
   
   if (isLoading) {
     return (
@@ -34,6 +34,18 @@ const UserTrips: React.FC<UserTripsProps> = ({ userId }) => {
             </CardContent>
           </Card>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-8">
+        <h3 className="text-xl font-bold mb-4">Your Reservations</h3>
+        <Card className="p-6 bg-red-50">
+          <p className="text-red-700">Error loading your reservations. Please try again later.</p>
+          <p className="text-sm text-red-600 mt-2">{error.message}</p>
+        </Card>
       </div>
     );
   }

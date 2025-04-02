@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { User, Boat, Reservation, Payment, Zone, Waiver, WaiverAcceptance } from '@/lib/supabase';
@@ -65,15 +66,28 @@ export const useGetUserReservations = (userId?: string) => {
       const { data, error } = await supabase
         .from('reservations')
         .select(`
-          *,
-          boats(*),
-          start_zone:zones(*),
-          end_zone:zones(*)
+          id,
+          status,
+          start_time,
+          end_time, 
+          distance_traveled,
+          total_minutes,
+          estimated_cost,
+          final_cost,
+          created_at,
+          boats:boat_id(*),
+          start_zone:start_zone_id(*),
+          end_zone:end_zone_id(*)
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching user reservations:', error);
+        throw error;
+      }
+      
+      console.log('Fetched user reservations:', data);
       return data;
     },
     enabled: !!userId

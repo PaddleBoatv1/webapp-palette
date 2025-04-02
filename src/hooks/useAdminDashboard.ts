@@ -22,11 +22,20 @@ export function useAdminDashboard() {
       let query = supabase
         .from('reservations')
         .select(`
-          *,
-          users(email, full_name),
-          boats(*),
-          start_zone:zones(id, zone_name),
-          end_zone:zones(id, zone_name)
+          id,
+          status,
+          start_time,
+          end_time,
+          distance_traveled,
+          total_minutes,
+          estimated_cost,
+          final_cost,
+          created_at,
+          updated_at,
+          users:user_id(id, email, full_name),
+          boats:boat_id(id, boat_name, status),
+          start_zone:start_zone_id(id, zone_name),
+          end_zone:end_zone_id(id, zone_name)
         `)
         .order('created_at', { ascending: false });
         
@@ -59,10 +68,13 @@ export function useAdminDashboard() {
       const { data, error } = await supabase
         .from('reservations')
         .select(`
-          *,
-          users(email, full_name),
-          start_zone:zones(id, zone_name),
-          end_zone:zones(id, zone_name)
+          id,
+          status,
+          created_at,
+          updated_at,
+          users:user_id(id, email, full_name),
+          start_zone:start_zone_id(id, zone_name),
+          end_zone:end_zone_id(id, zone_name)
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
