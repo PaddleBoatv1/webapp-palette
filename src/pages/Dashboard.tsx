@@ -1,15 +1,23 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { MapPin, Calendar, Clock, LogOut, Ship, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGetUserReservations } from "@/hooks/useDatabase";
+import { toast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const { data: userReservations, isLoading } = useGetUserReservations(user?.id);
+  
+  // Log the user role to debug
+  useEffect(() => {
+    if (user) {
+      console.log("Dashboard - Current user:", user.email, "Role:", user.role);
+    }
+  }, [user]);
   
   const hasUpcomingReservations = userReservations?.some(
     (res: any) => res.status === 'confirmed' || res.status === 'pending'
@@ -23,7 +31,14 @@ const Dashboard = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-blue-600">PaddleRide</h1>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">Welcome, {user?.email || 'User'}</span>
+              <span className="text-gray-600">
+                Welcome, {user?.email || 'User'} 
+                {user?.role === 'admin' && (
+                  <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                    Admin
+                  </span>
+                )}
+              </span>
               {user?.role === 'admin' && (
                 <Link to="/admin">
                   <Button variant="outline" size="sm">
@@ -93,6 +108,21 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+        
+        {user?.role === 'admin' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
+            <h3 className="text-xl font-semibold text-amber-800 mb-2">Admin Tools</h3>
+            <p className="text-amber-600 mb-4">Access the admin dashboard to manage bookings, boats, and more.</p>
+            <div className="flex space-x-4">
+              <Link to="/admin">
+                <Button size="lg" className="bg-amber-600 hover:bg-amber-700">
+                  <Settings className="h-5 w-5 mr-2" />
+                  Admin Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
         
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
           <h3 className="text-xl font-semibold text-blue-800 mb-2">Ready for an adventure?</h3>

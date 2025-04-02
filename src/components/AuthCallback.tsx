@@ -47,6 +47,42 @@ const AuthCallback: React.FC = () => {
         if (session) {
           console.log("Session found:", session.user.id);
           
+          // Check if the user already exists in the database
+          try {
+            const { data: userData, error: userError } = await supabase
+              .from('users')
+              .select('id, role')
+              .eq('id', session.user.id)
+              .single();
+              
+            if (userError && userError.code !== 'PGRST116') {
+              console.error("Error checking user existence:", userError);
+            }
+            
+            if (!userData) {
+              console.log("Creating new user profile");
+              // Insert new user profile if it doesn't exist
+              const { error: insertError } = await supabase
+                .from('users')
+                .insert([
+                  { 
+                    id: session.user.id, 
+                    email: session.user.email,
+                    full_name: session.user.user_metadata?.full_name || '',
+                    role: 'customer' // Default role
+                  }
+                ]);
+                
+              if (insertError) {
+                console.error("Error creating user profile:", insertError);
+              }
+            } else if (userData.role === 'admin') {
+              console.log("User is an admin");
+            }
+          } catch (err) {
+            console.error("User profile check/creation error:", err);
+          }
+          
           // Success message
           toast({
             title: "Authentication Successful",
