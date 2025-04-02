@@ -26,7 +26,7 @@ const AuthCallback: React.FC = () => {
       
       // Return to login page
       setTimeout(() => {
-        navigate('/login');
+        navigate('/login', { replace: true });
       }, 1500);
       
       setProcessing(false);
@@ -37,64 +37,7 @@ const AuthCallback: React.FC = () => {
       try {
         console.log("Processing authentication callback");
         
-        // Get the hash from the URL or session storage
-        let hash = window.location.hash;
-        if (!hash && sessionStorage.getItem('auth_hash')) {
-          hash = sessionStorage.getItem('auth_hash') || '';
-        }
-        
-        if (hash && hash.includes('access_token')) {
-          // Extract tokens from hash
-          const hashParams = new URLSearchParams(hash.substring(1));
-          const accessToken = hashParams.get('access_token');
-          const refreshToken = hashParams.get('refresh_token');
-          
-          if (!accessToken) {
-            throw new Error("Access token not found in URL");
-          }
-          
-          // Set the session with tokens
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken || '',
-          });
-          
-          if (error) {
-            throw error;
-          }
-          
-          // Clean up
-          sessionStorage.removeItem('auth_hash');
-          
-          // Get user role
-          if (data.user) {
-            const { data: userData, error: userError } = await supabase
-              .from('users')
-              .select('role')
-              .eq('id', data.user.id)
-              .single();
-              
-            if (userError && userError.code !== 'PGRST116') {
-              console.error("Error fetching user role:", userError);
-            }
-            
-            // Success message
-            toast({
-              title: "Authentication Successful",
-              description: "You have been logged in successfully",
-            });
-            
-            // Redirect based on role
-            if (userData?.role === 'admin') {
-              navigate('/admin', { replace: true });
-            } else {
-              navigate('/dashboard', { replace: true });
-            }
-            return;
-          }
-        }
-        
-        // Check for existing session as fallback
+        // Check for existing session directly - simplify the flow
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
@@ -102,18 +45,7 @@ const AuthCallback: React.FC = () => {
         }
         
         if (session) {
-          console.log("Using existing session");
-          
-          // Get user role
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (userError && userError.code !== 'PGRST116') {
-            console.error("Error fetching user role:", userError);
-          }
+          console.log("Session found:", session.user.id);
           
           // Success message
           toast({
@@ -121,17 +53,13 @@ const AuthCallback: React.FC = () => {
             description: "You have been logged in successfully",
           });
           
-          // Redirect based on role
-          if (userData?.role === 'admin') {
-            navigate('/admin', { replace: true });
-          } else {
-            navigate('/dashboard', { replace: true });
-          }
+          // Redirect to dashboard by default - role-based routing is handled at the route level
+          navigate('/dashboard', { replace: true });
           return;
         }
         
         // No valid session could be established
-        throw new Error("Authentication failed");
+        throw new Error("Authentication failed - no session found");
       } catch (error: any) {
         console.error("Authentication callback error:", error);
         setError(error.message || "Authentication failed");
@@ -147,7 +75,7 @@ const AuthCallback: React.FC = () => {
         
         // Redirect to login
         setTimeout(() => {
-          navigate('/login');
+          navigate('/login', { replace: true });
         }, 1500);
       } finally {
         setProcessing(false);
@@ -185,7 +113,7 @@ const AuthCallback: React.FC = () => {
         <button 
           onClick={() => {
             sessionStorage.removeItem('auth_hash');
-            navigate('/login');
+            navigate('/login', { replace: true });
           }} 
           className="ml-1 text-blue-500 hover:underline"
         >
