@@ -1,9 +1,8 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { User, Boat, Reservation, Payment, Zone, Waiver, WaiverAcceptance } from '@/lib/supabase';
 import { toast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/use-auth';
 
 // =================== USER OPERATIONS ===================
 export const useGetCurrentUser = () => {
