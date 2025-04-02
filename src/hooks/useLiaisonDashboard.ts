@@ -274,6 +274,7 @@ export const useLiaisonDashboard = () => {
           throw new Error(error.message || 'Failed to update job');
         }
         
+        console.log('Job assigned successfully without incrementing count:', data);
         return { success: true, message: 'Job assigned successfully' };
       }
 
