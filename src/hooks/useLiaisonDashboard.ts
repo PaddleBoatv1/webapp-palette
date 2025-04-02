@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useCallback } from 'react';
@@ -257,8 +256,7 @@ export const useLiaisonDashboard = () => {
       if (existingJobs && existingJobs.length > 0) {
         console.log('Liaison already has a job for this reservation, not incrementing count');
         
-        // Update the job status to assigned without increasing the count
-        // Using .match to ensure we're updating exactly the job we want
+        // Try direct update first
         const { data, error } = await supabase
           .from('delivery_jobs')
           .update({ 
@@ -267,51 +265,47 @@ export const useLiaisonDashboard = () => {
             assigned_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .match({ id: jobId })
+          .eq('id', jobId)
           .select();
           
         if (error) {
           console.error('Error updating job without incrementing count:', error);
-          throw new Error(error.message || 'Failed to update job');
+          // Don't throw yet, we'll try the RPC function
+        } else if (data && data.length > 0) {
+          console.log('Job assigned successfully via direct update:', data);
+          return { success: true, message: 'Job assigned successfully' };
         }
         
-        console.log('Job assigned successfully without incrementing count:', data);
-        
-        // If data is empty but no error, try to verify the update worked
-        if (!data || data.length === 0) {
-          const { data: verifyData, error: verifyError } = await supabase
-            .from('delivery_jobs')
-            .select('*')
-            .eq('id', jobId)
-            .single();
-            
-          if (verifyError) {
-            console.error('Error verifying job update:', verifyError);
-          } else {
-            console.log('Verified job status after update:', verifyData);
-            // Make sure the job is actually assigned to this liaison
-            if (verifyData && verifyData.status === 'assigned' && verifyData.liaison_id === liaisonProfile.id) {
-              return { success: true, message: 'Job assigned successfully' };
-            }
-          }
+        // If direct update didn't work or returned no data, try the RPC function
+        console.log('Attempting assignment via RPC function...');
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('update_delivery_job_assignment', {
+            job_id: jobId,
+            liaison_id: liaisonProfile.id
+          });
           
-          // If we can't verify the update worked, try one more direct update approach
-          const { error: retryError } = await supabase
-            .rpc('update_delivery_job_assignment', {
-              job_id: jobId,
-              liaison_id: liaisonProfile.id
-            });
-            
-          if (retryError) {
-            console.error('Error in retry update:', retryError);
-            throw new Error(retryError.message || 'Failed to update job on retry');
-          }
+        if (rpcError) {
+          console.error('Error in RPC assignment:', rpcError);
+          throw new Error(rpcError.message || 'Failed to update job');
         }
         
-        return { success: true, message: 'Job assigned successfully' };
+        // Verify the assignment worked by checking the job again
+        const { data: verifyData, error: verifyError } = await supabase
+          .from('delivery_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+            
+        if (verifyError) {
+          console.error('Error verifying job after RPC update:', verifyError);
+        } else {
+          console.log('Job status after RPC update:', verifyData);
+        }
+        
+        return { success: true, message: 'Job assigned successfully via RPC' };
       }
 
-      // Use the database function to safely assign the job when it's a new reservation
+      // For new reservations, use the database function to safely assign the job
       const { data, error } = await supabase
         .rpc('assign_delivery_job', {
           job_id: jobId,

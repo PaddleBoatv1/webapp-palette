@@ -532,6 +532,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_delivery_job_assignment: {
+        Args: {
+          job_id: string
+          liaison_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
